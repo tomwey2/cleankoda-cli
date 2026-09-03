@@ -3,7 +3,7 @@ import asyncio
 import sys
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout.containers import HSplit, Window
+from prompt_toolkit.layout.containers import FloatContainer, HSplit, Window
 from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.widgets import Frame, TextArea
@@ -59,7 +59,8 @@ root_container = HSplit([
     status_line
 ])
 
-layout = Layout(root_container, focused_element=input_field)
+float_container = FloatContainer(content=root_container, floats=[])
+layout = Layout(float_container, focused_element=input_field)
 
 # 3. Keybindings
 kb = KeyBindings()
@@ -94,7 +95,7 @@ async def stream_response(app: Application, user_text: str):
     # Fast path for slash commands
     if user_text.startswith("/"):
         ctx = CommandContext(memory=memory, app=app)
-        result = registry.dispatch(user_text, ctx)
+        result = await registry.dispatch_async(user_text, ctx)
         if result.output:
             history_area.text += f"\n\n[System]: {result.output}\n"
             history_area.buffer.cursor_position = len(history_area.text)
@@ -145,6 +146,7 @@ app = Application(
     full_screen=True,  # Lässt die CLI wie eine native App wirken
     mouse_support=True,
 )
+app.float_container = float_container
 
 def run_headless(prompt_text: str) -> None:
     """Führt den Prompt im Headless-Modus (ohne TUI) aus."""

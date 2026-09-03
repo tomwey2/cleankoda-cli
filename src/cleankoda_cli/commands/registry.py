@@ -1,3 +1,5 @@
+import asyncio
+import inspect
 from dataclasses import dataclass
 from typing import Any, Callable
 
@@ -19,7 +21,7 @@ class CommandResult:
     should_exit: bool = False
 
 
-CommandHandler = Callable[[list[str], CommandContext], CommandResult]
+CommandHandler = Callable[[list[str], CommandContext], Any]
 
 
 @dataclass
@@ -64,25 +66,56 @@ class CommandRegistry:
 
         return decorator
 
-    def dispatch(self, user_input: str, ctx: CommandContext) -> CommandResult:
-        """Parse input line and execute matching command if found."""
+    def _get_command_and_args(
+        self, user_input: str
+    ) -> tuple[Command | None, list[str], CommandResult | None]:
         parts = user_input.strip().split()
         if not parts:
-            return CommandResult()
+            return None, [], CommandResult()
 
         cmd_name = parts[0].lstrip("/").lower()
         args = parts[1:]
 
         if cmd_name not in self._commands:
-            return CommandResult(
-                output=f"Unknown command: '/{cmd_name}'. Type '/help' for available commands."
+            return (
+                None,
+                [],
+                CommandResult(
+                    output=f"Unknown command: '/{cmd_name}'. Type '/help' for available commands."
+                ),
             )
 
-        cmd = self._commands[cmd_name]
+        return self._commands[cmd_name], args, None
+
+    def dispatch(self, user_input: str, ctx: CommandContext) -> CommandResult:
+        """Parse input line and execute matching command if found (for sync contexts)."""
+        cmd, args, err_res = self._get_command_and_args(user_input)
+        if err_res is not None:
+            return err_res
+
+        assert cmd is not None
         try:
-            return cmd.handler(args, ctx)
+            res = cmd.handler(args, ctx)
+            if inspect.isawaitable(res):
+                return asyncio.run(res)
+            return res
         except Exception as e:
-            return CommandResult(output=f"Error executing '/{cmd_name}': {e}")
+            return CommandResult(output=f"Error executing '/{cmd.name}': {e}")
+
+    async def dispatch_async(self, user_input: str, ctx: CommandContext) -> CommandResult:
+        """Parse input line and execute matching command if found (for async contexts)."""
+        cmd, args, err_res = self._get_command_and_args(user_input)
+        if err_res is not None:
+            return err_res
+
+        assert cmd is not None
+        try:
+            res = cmd.handler(args, ctx)
+            if inspect.isawaitable(res):
+                return await res
+            return res
+        except Exception as e:
+            return CommandResult(output=f"Error executing '/{cmd.name}': {e}")
 
     def list_commands(self) -> list[Command]:
         """Return unique registered commands."""
