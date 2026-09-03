@@ -1,0 +1,27 @@
+[project]
+name = "cleankoda-cli"
+version = "0.1.0"
+description = "Coding agent harness for clean code software development"
+readme = "README.md"
+authors = [
+    { name = "Thomas", email = "tomwey2@gmail.com" }
+]
+requires-python = ">=3.11"
+dependencies = [
+    "dotenv>=0.9.9",
+    "mistralai>=2.9.4",
+    "prompt-toolkit>=3.0.53",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+cleankoda-cli = "cleankoda_cli.tui:main"
+
+[build-system]
+requires = ["uv_build>=0.9.7,<0.10.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "debugpy>=1.8.21",
+]

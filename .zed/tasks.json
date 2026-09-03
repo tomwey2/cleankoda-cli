@@ -1,0 +1,14 @@
+[
+  {
+    "label": "uv run cleankoda-cli",
+    "command": "uv",
+    "args": ["run", "cleankoda-cli"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  },
+  {
+    "label": "uv run current file",
+    "command": "uv",
+    "args": ["run", "python", "$ZED_FILE"],
+    "cwd": "$ZED_WORKTREE_ROOT"
+  }
+]
