@@ -182,7 +182,10 @@ def main(argv: list[str] | None = None) -> None:
 
     piped_input = None
     if not sys.stdin.isatty():
-        piped_input = sys.stdin.read().strip()
+        try:
+            piped_input = sys.stdin.read().strip()
+        except OSError:
+            piped_input = None
 
     final_prompt = prompt or piped_input
 
