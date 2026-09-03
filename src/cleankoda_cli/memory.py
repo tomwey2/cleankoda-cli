@@ -18,11 +18,27 @@ class Memory:
             self._file.parent.mkdir(parents=True, exist_ok=True)
 
         self._messages: list[dict[str, Any] | Any] = []
-        if system_prompt:
-            self.add_system(system_prompt)
-        if initial_messages:
-            for msg in initial_messages:
-                self.add_message(msg)
+        if not self.load_memory():
+            if system_prompt:
+                self.add_system(system_prompt)
+            if initial_messages:
+                for msg in initial_messages:
+                    self.add_message(msg)
+
+    def load_memory(self, file_path: str | Path | None = None) -> bool:
+        """Load messages from a log file into memory. Returns True if loaded successfully."""
+        target_file = Path(file_path) if file_path else self._file
+        if not target_file or not target_file.is_file():
+            return False
+        try:
+            with open(target_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list) and len(data) > 0:
+                self._messages = data
+                return True
+        except Exception:
+            pass
+        return False
 
     @property
     def file(self) -> Path | None:

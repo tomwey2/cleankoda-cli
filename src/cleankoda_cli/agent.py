@@ -36,29 +36,3 @@ def run_agent(memory: Memory) -> str | None:
         for tool_call in message.tool_calls:
             result = run_tool(tool_call)
             memory.add_tool_message(tool_call_id=tool_call.id, content=result)
-
-
-def agentloop():
-    memory = Memory(system_prompt=SYSTEM_PROMPT)
-
-    print("mini-code ready. Type '/help' for commands or '/exit' to quit.")
-    while True:
-        user_input = input("\nYou: ")
-        if user_input.startswith("/"):
-            ctx = CommandContext(memory=memory)
-            result = registry.dispatch(user_input, ctx)
-            if result.output:
-                print(f"\nSystem: {result.output}")
-            if result.should_exit:
-                break
-            continue
-
-        if user_input.strip().lower() in ("exit", "quit"):
-            break
-        memory.add_user(user_input)
-        reply = run_agent(memory)
-        print(f"\nAgent: {reply}")
-
-
-if __name__ == "__main__":
-    agentloop()
