@@ -18,11 +18,12 @@ BANNER = """
 
 
 class TUI:
-    """Terminal User Interface Anwendung für cleankoda-cli."""
+    """Terminal User Interface application for cleankoda-cli."""
 
     def __init__(self, memory: Memory) -> None:
         self.memory = memory
         self.showing_shortcuts = False
+        self.is_processing = False
 
         self.history_area = TextArea(
             text=BANNER
@@ -45,7 +46,7 @@ class TUI:
 
         self.status_line = TextArea(
             height=2,
-            text=f"{self.get_session_status_text()}\n? for shortcuts",
+            text=f"{self.get_session_status_text()}\nCtrl+H for shortcuts",
             multiline=True,
             wrap_lines=True,
         )
@@ -82,14 +83,14 @@ class TUI:
             self.status_line.window.height = 5
             self.status_line.text = (
                 f"{session_text}\n"
-                "Shortcuts & Hilfe (ESC zum Schließen):\n"
-                "• Enter   : Nachricht senden\n"
-                "• Ctrl+C  : App beenden\n"
-                "• Ctrl+Q  : App beenden"
+                "Shortcuts & Help (ESC to close):\n"
+                "• Enter   : Send message\n"
+                "• Ctrl+C  : Exit application\n"
+                "• Ctrl+Q  : Exit application"
             )
         else:
             self.status_line.window.height = 2
-            self.status_line.text = f"{session_text}\n? for shortcuts"
+            self.status_line.text = f"{session_text}\nCtrl+H for shortcuts"
 
     def _register_keybindings(self) -> None:
         @self.kb.add("c-c")
@@ -97,7 +98,7 @@ class TUI:
         def _exit(event):
             event.app.exit()
 
-        @self.kb.add("?", eager=True)
+        @self.kb.add("c-h", eager=True)
         def _show_shortcuts(event):
             self.showing_shortcuts = True
             self.input_field.read_only = True
@@ -107,19 +108,34 @@ class TUI:
         @self.kb.add("escape", eager=True)
         def _hide_shortcuts(event):
             self.showing_shortcuts = False
-            self.input_field.read_only = False
+            if not self.is_processing:
+                self.input_field.read_only = False
             self.update_status_line()
             event.app.invalidate()
 
     def _accept_handler(self, buff) -> None:
-        if self.input_field.read_only:
+        if self.input_field.read_only or self.is_processing:
             return
         user_input = self.input_field.text.strip()
         if not user_input:
             return
 
         self.input_field.text = ""
-        asyncio.create_task(self.stream_response(user_input))
+        asyncio.create_task(self._safe_stream_response(user_input))
+
+    async def _safe_stream_response(self, user_text: str) -> None:
+        self.is_processing = True
+        self.input_field.read_only = True
+        try:
+            await self.stream_response(user_text)
+        except Exception as e:
+            self.history_area.text += f"\n\n[Error]: {e}\n"
+            self.history_area.buffer.cursor_position = len(self.history_area.text)
+        finally:
+            self.is_processing = False
+            if not self.showing_shortcuts:
+                self.input_field.read_only = False
+            self.app.invalidate()
 
     async def stream_response(self, user_text: str) -> None:
         if user_text.startswith("/"):
@@ -149,19 +165,18 @@ class TUI:
             self.app.invalidate()
 
         full_response = "".join(chunks)
-        if full_response:
+        if full_response and not full_response.startswith("["):
             last_msg = self.memory.messages[-1] if self.memory.messages else None
             last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
             if last_role != "assistant":
                 self.memory.add_assistant(full_response)
 
     def run(self) -> None:
-        print("Hello from mini-code!")
         self.update_status_line()
         asyncio.run(self.app.run_async())
 
 
 def run_tui(memory: Memory) -> None:
-    """Startet die interaktive TUI-Anwendung mit der übergebenen Memory-Instanz."""
+    """Start the interactive TUI application with the provided Memory instance."""
     tui = TUI(memory)
     tui.run()

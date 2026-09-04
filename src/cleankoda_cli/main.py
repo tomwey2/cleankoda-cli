@@ -66,7 +66,7 @@ def main(argv: list[str] | None = None) -> None:
             print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
             sys.exit(1)
         code = run_headless(final_prompt, memory)
-        if code != 0:
+        if isinstance(code, int) and code != 0:
             sys.exit(code)
     else:
         run_tui(memory)
