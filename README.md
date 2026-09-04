@@ -31,20 +31,20 @@
 
 ### Setup
 
-1. **Install Dependencies**:
-   Install all dependencies using `uv`:
+1. **Install the tool**:
+   Download the code of this repository and install the tool with the following `uv` command:
    ```bash
-   uv sync
+   uv tool install .
    ```
-
+  Then cleankoda-cli is installed in the folder `~/.local/bin` (Linux) and it can be used system wide. 
 ### Usage
 
 #### Running the TUI Application
 
-To launch `cleankoda-cli` with the interactive terminal interface, run:
+To launch `cleankoda-cli` with the interactive terminal interface, go to your project folder and run:
 
 ```bash
-uv run cleankoda-cli
+cleankoda-cli
 ```
 
 #### Headless Mode (Scripting & CI/CD)
@@ -53,17 +53,17 @@ uv run cleankoda-cli
 
 - **Positional Prompt Argument**:
   ```bash
-  uv run cleankoda-cli "Explain the main function in src/cleankoda_cli/tui.py"
+  cleankoda-cli "Explain the main function in src/cleankoda_cli/tui.py"
   ```
 
 - **Prompt Flag (`-p` / `--prompt`)**:
   ```bash
-  uv run cleankoda-cli -p "Generate a unit test for memory.py"
+  cleankoda-cli -p "Generate a unit test for memory.py"
   ```
 
 - **Piped Standard Input**:
   ```bash
-  cat src/cleankoda_cli/tui.py | uv run cleankoda-cli "Review this file for potential bugs"
+  cat src/cleankoda_cli/tui.py | cleankoda-cli "Review this file for potential bugs"
   ```
 
 - **Force Execution Mode Flags**:
