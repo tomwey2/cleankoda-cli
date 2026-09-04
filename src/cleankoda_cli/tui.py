@@ -10,11 +10,26 @@ from cleankoda_cli.llm_service import stream_chat_response
 from cleankoda_cli.memory import Memory
 from cleankoda_cli.session_state import SessionState
 
+from prompt_toolkit.lexers import Lexer
+
 BANNER = """
-▄▄▄▄ █ ▄▄▄  ▄▄▄  ▄▄▄      █ ▄  ▄▄▄▄ ▄▄▄█  ▄▄▄
-█    █ █▀▀ █  █  █  █ ▄▄▄ █▀▄  █  █ █  █ █  █
-▀▀▀▀ ▀ ▀▀▀ ▀▀▀▀▀ ▀  ▀     ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀▀
+ ▄▄▄▄ █ ▄▄▄  ▄▄▄  ▄▄▄  █ ▄  ▄▄▄▄ ▄▄▄█  ▄▄▄
+ █    █ █▀▀ █  █  █  █ █▀▄  █  █ █  █ █  █
+ ▀▀▀▀ ▀ ▀▀▀ ▀▀▀▀▀ ▀  ▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀▀
 """
+
+
+class ChatLexer(Lexer):
+    """Lexer that styles user lines starting with ' > ' in bold."""
+
+    def lex_document(self, document):
+        def get_line(lineno):
+            line = document.lines[lineno]
+            if line.startswith(" > "):
+                return [("bold", line)]
+            return [("", line)]
+
+        return get_line
 
 
 class TUI:
@@ -27,14 +42,15 @@ class TUI:
 
         self.history_area = TextArea(
             text=BANNER
-            + "Welcome to cleankoda-cli!\n"
-            + "The coding agent for clean code software development.\n"
+            + " Welcome to cleankoda-cli!\n"
+            + " The coding agent for clean code software development.\n"
             + ("─" * 60)
             + "\n",
             scrollbar=True,
             read_only=True,
             wrap_lines=True,
             focusable=False,
+            lexer=ChatLexer(),
         )
 
         self.input_field = TextArea(
@@ -150,7 +166,8 @@ class TUI:
                 self.app.exit()
             return
 
-        self.history_area.text += f"\n\n[You]: {user_text}\n[Assistant]: "
+        formatted_user = "\n".join(f" > {line}" for line in user_text.splitlines()) if user_text else f" > {user_text}"
+        self.history_area.text += f"\n\n{formatted_user}\n\n   "
         self.history_area.buffer.cursor_position = len(self.history_area.text)
         self.app.invalidate()
 
@@ -160,7 +177,8 @@ class TUI:
         chunks = []
         async for chunk in stream_chat_response(self.memory, state):
             chunks.append(chunk)
-            self.history_area.text += chunk
+            indented_chunk = chunk.replace("\n", "\n   ")
+            self.history_area.text += indented_chunk
             self.history_area.buffer.cursor_position = len(self.history_area.text)
             self.app.invalidate()
 
