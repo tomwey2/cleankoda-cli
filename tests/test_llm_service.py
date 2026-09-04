@@ -88,11 +88,15 @@ class TestLLMService(unittest.TestCase):
 
     def test_stream_chat_response_tool_execution(self):
         async def _test():
+            import tempfile
+            from pathlib import Path
             from cleankoda_cli.memory import Memory
 
-            state = SessionState(provider="openai", model="gpt-4o")
-            mem = Memory(system_prompt="Test")
-            mem.add_user("List files")
+            with tempfile.TemporaryDirectory() as tmpdir:
+                file_path = Path(tmpdir) / "memory.json"
+                state = SessionState(provider="openai", model="gpt-4o")
+                mem = Memory(system_prompt="Test", file=file_path)
+                mem.add_user("List files")
 
             chunk_tool_1 = {
                 "id": "chatcmpl-1",

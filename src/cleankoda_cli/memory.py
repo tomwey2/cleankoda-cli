@@ -10,7 +10,7 @@ class Memory:
         self,
         system_prompt: str | None = None,
         initial_messages: list[dict[str, Any] | Any] | None = None,
-        file: str | Path | None = "conversation.json",
+        file: str | Path | None = None,
     ) -> None:
         """Initialize Memory with an optional system prompt, initial messages list, and log file."""
         self._file: Path | None = Path(file) if file else None
