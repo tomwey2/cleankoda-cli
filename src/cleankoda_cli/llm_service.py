@@ -142,6 +142,18 @@ async def stream_chat_response(
 
         tool_calls = getattr(response_msg, "tool_calls", None)
         if not tool_calls:
+            content_text = getattr(response_msg, "content", None)
+            if content_text:
+                if memory_obj is not None:
+                    last_msg = memory_obj.messages[-1] if memory_obj.messages else None
+                    last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
+                    if last_role != "assistant":
+                        memory_obj.add_assistant(content_text)
+                else:
+                    last_msg = msg_list[-1] if msg_list else None
+                    last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
+                    if last_role != "assistant":
+                        msg_list.append({"role": "assistant", "content": content_text})
             break
 
         # Save assistant message with tool calls as a clean dictionary

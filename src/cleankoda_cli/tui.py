@@ -1,16 +1,16 @@
 import asyncio
+import re
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout.containers import FloatContainer, HSplit
 from prompt_toolkit.layout.layout import Layout
+from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.widgets import Frame, TextArea
 
 from cleankoda_cli.commands import CommandContext, registry
 from cleankoda_cli.llm_service import stream_chat_response
 from cleankoda_cli.memory import Memory
 from cleankoda_cli.session_state import SessionState
-
-from prompt_toolkit.lexers import Lexer
 
 BANNER = """
  ▄▄▄▄ █ ▄▄▄  ▄▄▄  ▄▄▄  █ ▄  ▄▄▄▄ ▄▄▄█  ▄▄▄
@@ -20,14 +20,30 @@ BANNER = """
 
 
 class ChatLexer(Lexer):
-    """Lexer that styles user lines starting with ' > ' in bold."""
+    """Lexer that styles user lines starting with '>' in bold and parses inline Markdown formatting live."""
 
     def lex_document(self, document):
+        pattern = re.compile(r"(\*\*.*?\*\*|\*.*?\*|`.*?`)")
+
         def get_line(lineno):
             line = document.lines[lineno]
-            if line.startswith(" > "):
+            if line.startswith(">"):
                 return [("bold", line)]
-            return [("", line)]
+
+            parts = pattern.split(line)
+            result = []
+            for part in parts:
+                if not part:
+                    continue
+                if part.startswith("**") and part.endswith("**") and len(part) >= 4:
+                    result.append(("bold", part[2:-2]))
+                elif part.startswith("*") and part.endswith("*") and len(part) >= 2:
+                    result.append(("italic", part[1:-1]))
+                elif part.startswith("`") and part.endswith("`") and len(part) >= 2:
+                    result.append(("underline", part[1:-1]))
+                else:
+                    result.append(("", part))
+            return result
 
         return get_line
 
@@ -166,28 +182,19 @@ class TUI:
                 self.app.exit()
             return
 
-        formatted_user = "\n".join(f" > {line}" for line in user_text.splitlines()) if user_text else f" > {user_text}"
-        self.history_area.text += f"\n\n{formatted_user}\n\n   "
+        formatted_user = "\n".join(f"> {line}" for line in user_text.splitlines()) if user_text else f"> {user_text}"
+        self.history_area.text += f"\n\n{formatted_user}\n\n  "
         self.history_area.buffer.cursor_position = len(self.history_area.text)
         self.app.invalidate()
 
         self.memory.add_user(user_text)
 
         state = SessionState.load()
-        chunks = []
         async for chunk in stream_chat_response(self.memory, state):
-            chunks.append(chunk)
-            indented_chunk = chunk.replace("\n", "\n   ")
+            indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk
             self.history_area.buffer.cursor_position = len(self.history_area.text)
             self.app.invalidate()
-
-        full_response = "".join(chunks)
-        if full_response and not full_response.startswith("["):
-            last_msg = self.memory.messages[-1] if self.memory.messages else None
-            last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
-            if last_role != "assistant":
-                self.memory.add_assistant(full_response)
 
     def run(self) -> None:
         self.update_status_line()
