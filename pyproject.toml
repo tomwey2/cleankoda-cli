@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cleankoda-cli = "cleankoda_cli.tui:main"
+cleankoda-cli = "cleankoda_cli.main:main"
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]

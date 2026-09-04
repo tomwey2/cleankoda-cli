@@ -1,21 +1,14 @@
-import argparse
 import asyncio
-import sys
 from prompt_toolkit.application import Application
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout.containers import FloatContainer, HSplit, Window
-from prompt_toolkit.layout.controls import FormattedTextControl
+from prompt_toolkit.layout.containers import FloatContainer, HSplit
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.widgets import Frame, TextArea
 
-from cleankoda_cli.agent import SYSTEM_PROMPT, run_agent
 from cleankoda_cli.commands import CommandContext, registry
+from cleankoda_cli.llm_service import stream_chat_response
 from cleankoda_cli.memory import Memory
 from cleankoda_cli.session_state import SessionState
-from cleankoda_cli.llm_service import stream_chat_response
-
-# Memory instanziieren
-memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
 
 BANNER = """
 ▄▄▄▄ █ ▄▄▄  ▄▄▄  ▄▄▄      █ ▄  ▄▄▄▄ ▄▄▄█  ▄▄▄
@@ -23,208 +16,152 @@ BANNER = """
 ▀▀▀▀ ▀ ▀▀▀ ▀▀▀▀▀ ▀  ▀     ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀▀
 """
 
-# 1. Widgets definieren
-# Oberer Bereich: Scrollbarer Verlauf / Ausgabefenster
-history_area = TextArea(
-    text=BANNER
-    + "Welcome to cleankoda-cli!\n"
-    + "The coding agent for clean code software development.\n"
-    + ("─" * 60)
-    + "\n",
-    scrollbar=True,
-    read_only=True,
-    wrap_lines=True,
-    focusable=False,
-)
 
-# Unterer Bereich: Fixierte Eingabezeile
-input_field = TextArea(
-    height=3,
-    prompt="> ",
-    multiline=False,
-    wrap_lines=False,
-)
+class TUI:
+    """Terminal User Interface Anwendung für cleankoda-cli."""
 
-def get_session_status_text() -> str:
-    state = SessionState.load()
-    return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature}"
+    def __init__(self, memory: Memory) -> None:
+        self.memory = memory
+        self.showing_shortcuts = False
 
-showing_shortcuts = False
-
-def update_status_line() -> None:
-    session_text = get_session_status_text()
-    if showing_shortcuts:
-        status_line.window.height = 5
-        status_line.text = (
-            f"{session_text}\n"
-            "Shortcuts & Hilfe (ESC zum Schließen):\n"
-            "• Enter   : Nachricht senden\n"
-            "• Ctrl+C  : App beenden\n"
-            "• Ctrl+Q  : App beenden"
+        self.history_area = TextArea(
+            text=BANNER
+            + "Welcome to cleankoda-cli!\n"
+            + "The coding agent for clean code software development.\n"
+            + ("─" * 60)
+            + "\n",
+            scrollbar=True,
+            read_only=True,
+            wrap_lines=True,
+            focusable=False,
         )
-    else:
-        status_line.window.height = 2
-        status_line.text = f"{session_text}\n? for shortcuts"
 
-# Unterer Bereich: Statuszeile
-status_line = TextArea(
-    height=2,
-    text=f"{get_session_status_text()}\n? for shortcuts",
-    multiline=True,
-    wrap_lines=True,
-)
+        self.input_field = TextArea(
+            height=3,
+            prompt="> ",
+            multiline=False,
+            wrap_lines=False,
+        )
 
-# 2. Layout aufbauen (Vertikaler Split: Verlauf oben, Eingabe unten im Rahmen)
-root_container = HSplit([
-    history_area,
-    Frame(input_field),
-    status_line
-])
+        self.status_line = TextArea(
+            height=2,
+            text=f"{self.get_session_status_text()}\n? for shortcuts",
+            multiline=True,
+            wrap_lines=True,
+        )
 
-float_container = FloatContainer(content=root_container, floats=[])
-layout = Layout(float_container, focused_element=input_field)
+        self.root_container = HSplit([
+            self.history_area,
+            Frame(self.input_field),
+            self.status_line,
+        ])
 
-# 3. Keybindings
-kb = KeyBindings()
+        self.float_container = FloatContainer(content=self.root_container, floats=[])
+        self.layout = Layout(self.float_container, focused_element=self.input_field)
 
-@kb.add("c-c")
-@kb.add("c-q")
-def _exit(event):
-    """Beendet die App sauber."""
-    event.app.exit()
+        self.kb = KeyBindings()
+        self._register_keybindings()
 
-@kb.add("?", eager=True)
-def _show_shortcuts(event):
-    global showing_shortcuts
-    showing_shortcuts = True
-    input_field.read_only = True
-    update_status_line()
-    event.app.invalidate()
+        self.input_field.accept_handler = self._accept_handler
 
-@kb.add("escape", eager=True)
-def _hide_shortcuts(event):
-    global showing_shortcuts
-    showing_shortcuts = False
-    input_field.read_only = False
-    update_status_line()
-    event.app.invalidate()
+        self.app = Application(
+            layout=self.layout,
+            key_bindings=self.kb,
+            full_screen=True,
+            mouse_support=True,
+        )
+        self.app.float_container = self.float_container
 
-# 4. LLM-Stream & Agent Integration
-async def stream_response(app: Application, user_text: str):
-    # Fast path for slash commands
-    if user_text.startswith("/"):
-        ctx = CommandContext(memory=memory, app=app)
-        result = await registry.dispatch_async(user_text, ctx)
-        if result.output:
-            history_area.text += f"\n\n[System]: {result.output}\n"
-            history_area.buffer.cursor_position = len(history_area.text)
-            app.invalidate()
-        update_status_line()
-        if result.should_exit:
-            app.exit()
-        return
+    def get_session_status_text(self) -> str:
+        state = SessionState.load()
+        return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature}"
 
-    # Nutzer-Eingabe zum Verlauf hinzufügen
-    history_area.text += f"\n\n[You]: {user_text}\n[Assistant]: "
-    history_area.buffer.cursor_position = len(history_area.text)
-    app.invalidate()  # UI neu zeichnen
+    def update_status_line(self) -> None:
+        session_text = self.get_session_status_text()
+        if self.showing_shortcuts:
+            self.status_line.window.height = 5
+            self.status_line.text = (
+                f"{session_text}\n"
+                "Shortcuts & Hilfe (ESC zum Schließen):\n"
+                "• Enter   : Nachricht senden\n"
+                "• Ctrl+C  : App beenden\n"
+                "• Ctrl+Q  : App beenden"
+            )
+        else:
+            self.status_line.window.height = 2
+            self.status_line.text = f"{session_text}\n? for shortcuts"
 
-    # Nutzer-Eingabe zur Memory hinzufügen
-    memory.add_user(user_text)
+    def _register_keybindings(self) -> None:
+        @self.kb.add("c-c")
+        @self.kb.add("c-q")
+        def _exit(event):
+            event.app.exit()
 
-    state = SessionState.load()
-    chunks = []
-    async for chunk in stream_chat_response(memory, state):
-        chunks.append(chunk)
-        history_area.text += chunk
-        history_area.buffer.cursor_position = len(history_area.text)
-        app.invalidate()
+        @self.kb.add("?", eager=True)
+        def _show_shortcuts(event):
+            self.showing_shortcuts = True
+            self.input_field.read_only = True
+            self.update_status_line()
+            event.app.invalidate()
 
-    full_response = "".join(chunks)
-    if full_response:
-        last_msg = memory.messages[-1] if memory.messages else None
-        last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
-        if last_role != "assistant":
-            memory.add_assistant(full_response)
+        @self.kb.add("escape", eager=True)
+        def _hide_shortcuts(event):
+            self.showing_shortcuts = False
+            self.input_field.read_only = False
+            self.update_status_line()
+            event.app.invalidate()
 
-def accept_handler(buff):
-    """Wird aufgerufen, wenn Enter gedrückt wird."""
-    if input_field.read_only:
-        return
-    user_input = input_field.text.strip()
-    if not user_input:
-        return
+    def _accept_handler(self, buff) -> None:
+        if self.input_field.read_only:
+            return
+        user_input = self.input_field.text.strip()
+        if not user_input:
+            return
 
-    # Eingabefeld leeren
-    input_field.text = ""
+        self.input_field.text = ""
+        asyncio.create_task(self.stream_response(user_input))
 
-    # Streaming asynchron im Hintergrund starten
-    asyncio.create_task(stream_response(app, user_input))
+    async def stream_response(self, user_text: str) -> None:
+        if user_text.startswith("/"):
+            ctx = CommandContext(memory=self.memory, app=self.app)
+            result = await registry.dispatch_async(user_text, ctx)
+            if result.output:
+                self.history_area.text += f"\n\n[System]: {result.output}\n"
+                self.history_area.buffer.cursor_position = len(self.history_area.text)
+                self.app.invalidate()
+            self.update_status_line()
+            if result.should_exit:
+                self.app.exit()
+            return
 
-input_field.accept_handler = accept_handler
+        self.history_area.text += f"\n\n[You]: {user_text}\n[Assistant]: "
+        self.history_area.buffer.cursor_position = len(self.history_area.text)
+        self.app.invalidate()
 
-# 5. Application starten (full_screen=True schaltet in den Alternate Screen)
-app = Application(
-    layout=layout,
-    key_bindings=kb,
-    full_screen=True,  # Lässt die CLI wie eine native App wirken
-    mouse_support=True,
-)
-app.float_container = float_container
+        self.memory.add_user(user_text)
 
-def run_headless(prompt_text: str) -> None:
-    """Führt den Prompt im Headless-Modus (ohne TUI) aus."""
-    mem = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
+        state = SessionState.load()
+        chunks = []
+        async for chunk in stream_chat_response(self.memory, state):
+            chunks.append(chunk)
+            self.history_area.text += chunk
+            self.history_area.buffer.cursor_position = len(self.history_area.text)
+            self.app.invalidate()
 
-    # Slash-Command Check
-    if prompt_text.startswith("/"):
-        ctx = CommandContext(memory=mem)
-        result = registry.dispatch(prompt_text, ctx)
-        if result.output:
-            print(result.output)
-        return
+        full_response = "".join(chunks)
+        if full_response:
+            last_msg = self.memory.messages[-1] if self.memory.messages else None
+            last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
+            if last_role != "assistant":
+                self.memory.add_assistant(full_response)
 
-    mem.add_user(prompt_text)
-    response = run_agent(mem)
-    if response:
-        print(response)
+    def run(self) -> None:
+        print("Hello from mini-code!")
+        self.update_status_line()
+        asyncio.run(self.app.run_async())
 
-def run_tui() -> None:
-    """Startet die interaktive TUI-Anwendung."""
-    print("Hello from mini-code!")
-    update_status_line()
-    asyncio.run(app.run_async())
 
-def main(argv: list[str] | None = None) -> None:
-    parser = argparse.ArgumentParser(description="mini-code CLI")
-    parser.add_argument("prompt_pos", nargs="*", help="Optionaler Prompt (Headless)")
-    parser.add_argument("-p", "--prompt", help="Prompt für den Headless-Modus")
-    parser.add_argument("--headless", action="store_true", help="Erzwingt Headless-Modus")
-    parser.add_argument("--tui", action="store_true", help="Erzwingt TUI-Modus")
-
-    args = parser.parse_args(argv)
-    prompt_parts = args.prompt_pos if args.prompt_pos else []
-    pos_prompt = " ".join(prompt_parts).strip() if prompt_parts else None
-    prompt = args.prompt or pos_prompt
-
-    piped_input = None
-    if not sys.stdin.isatty():
-        try:
-            piped_input = sys.stdin.read().strip()
-        except OSError:
-            piped_input = None
-
-    final_prompt = prompt or piped_input
-
-    if args.tui:
-        run_tui()
-    elif args.headless or final_prompt is not None:
-        if not final_prompt:
-            print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
-            sys.exit(1)
-        run_headless(final_prompt)
-    else:
-        run_tui()
-
-if __name__ == "__main__":
-    main()
+def run_tui(memory: Memory) -> None:
+    """Startet die interaktive TUI-Anwendung mit der übergebenen Memory-Instanz."""
+    tui = TUI(memory)
+    tui.run()
