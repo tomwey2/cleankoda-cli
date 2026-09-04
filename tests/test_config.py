@@ -62,7 +62,7 @@ class TestConfig(unittest.TestCase):
 
                 with open(config_file, "r", encoding="utf-8") as f:
                     content = json.load(f)
-                self.assertEqual(content, {"provider": "mistral"})
+                self.assertEqual(content.get("provider"), "mistral")
 
     def test_get_models_for_provider(self):
         with tempfile.TemporaryDirectory() as tmpdir:

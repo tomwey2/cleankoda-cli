@@ -11,7 +11,8 @@ from prompt_toolkit.widgets import Frame, TextArea
 from cleankoda_cli.agent import SYSTEM_PROMPT, run_agent
 from cleankoda_cli.commands import CommandContext, registry
 from cleankoda_cli.memory import Memory
-from cleankoda_cli.llm import model_name
+from cleankoda_cli.session_state import SessionState
+from cleankoda_cli.llm_service import stream_chat_response
 
 # Memory instanziieren
 memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
@@ -112,16 +113,17 @@ async def stream_response(app: Application, user_text: str):
     # Nutzer-Eingabe zur Memory hinzufügen
     memory.add_user(user_text)
 
-    # run_agent mit der Memory aufrufen
-    response_text = await asyncio.to_thread(run_agent, memory)
+    state = SessionState.load()
+    chunks = []
+    async for chunk in stream_chat_response(memory.messages, state):
+        chunks.append(chunk)
+        history_area.text += chunk
+        history_area.buffer.cursor_position = len(history_area.text)
+        app.invalidate()
 
-    if response_text:
-        # Antwort Zeichen für Zeichen in die UI streamen
-        for char in str(response_text):
-            await asyncio.sleep(0.01)
-            history_area.text += char
-            history_area.buffer.cursor_position = len(history_area.text)
-            app.invalidate()  # Erzwingt Redraw im Terminal-Buffer
+    full_response = "".join(chunks)
+    if full_response:
+        memory.add_assistant(full_response)
 
 def accept_handler(buff):
     """Wird aufgerufen, wenn Enter gedrückt wird."""

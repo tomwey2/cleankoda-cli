@@ -5,7 +5,6 @@ from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.widgets import Button, Dialog, RadioList
 
-import cleankoda_cli.llm as llm_module
 from cleankoda_cli.commands.registry import CommandContext, CommandResult, registry
 from cleankoda_cli.config import get_model, get_models_for_provider, get_provider, set_model
 

@@ -3,7 +3,6 @@ import sys
 import unittest
 from unittest.mock import patch, MagicMock
 
-from cleankoda_cli.llm import model_name
 from cleankoda_cli.tui import main, run_headless
 
 class TestCLIDualMode(unittest.TestCase):

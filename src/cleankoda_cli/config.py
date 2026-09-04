@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-import cleankoda_cli.llm as llm_module
+from cleankoda_cli.session_state import SessionState
 
 CONFIG_DIR = Path.home() / ".config" / "cleankoda"
 CONFIG_FILE = CONFIG_DIR / "config.json"
@@ -42,8 +42,18 @@ PROVIDER_MODELS: dict[str, list[str]] = {
 }
 
 
+def load_session_state() -> SessionState:
+    """Lädt den SessionState aus CONFIG_FILE."""
+    return SessionState.load(file_path=CONFIG_FILE)
+
+
+def save_session_state(state: SessionState) -> None:
+    """Speichert den SessionState in CONFIG_FILE."""
+    state.save(file_path=CONFIG_FILE)
+
+
 def load_config() -> dict[str, Any]:
-    """Lädt die Konfiguration aus ~/.config/cleankoda/config.json."""
+    """Lädt die Konfiguration aus CONFIG_FILE."""
     if not CONFIG_FILE.is_file():
         return {}
     try:
@@ -54,7 +64,7 @@ def load_config() -> dict[str, Any]:
 
 
 def save_config(config_data: dict[str, Any]) -> None:
-    """Speichert die Konfiguration in ~/.config/cleankoda/config.json (erstellt Ordner/Datei falls nicht vorhanden)."""
+    """Speichert ein Dict in CONFIG_FILE."""
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config_data, f, indent=2)
@@ -68,27 +78,26 @@ def get_provider() -> str | None:
 
 def set_provider(provider_name: str) -> None:
     """Setzt den Provider in der Konfiguration und speichert diese."""
-    config = load_config()
-    config["provider"] = provider_name
-    save_config(config)
+    state = load_session_state()
+    state.provider = provider_name
+    save_session_state(state)
 
 
 def get_models_for_provider(provider_name: str | None = None) -> list[str]:
-    """Gibt die Liste der verfügbaren Modelle für einen bestimmten Provider zurück (Standard: aktueller Provider oder mistral)."""
+    """Gibt die Liste der verfügbaren Modelle für einen Provider zurück."""
     if not provider_name:
         provider_name = get_provider() or "mistral"
     return PROVIDER_MODELS.get(provider_name.lower(), PROVIDER_MODELS["mistral"])
 
 
 def get_model() -> str:
-    """Gibt das aktuell konfigurierte LLM-Modell zurück (Standard: llm_module.model_name)."""
-    config = load_config()
-    return config.get("model", getattr(llm_module, "model_name", "mistral-medium-latest"))
+    """Gibt das aktuell konfigurierte LLM-Modell zurück."""
+    state = load_session_state()
+    return state.model
 
 
 def set_model(model_name: str) -> None:
-    """Setzt das Modell in der Konfiguration und aktualisiert llm_module.model_name."""
-    config = load_config()
-    config["model"] = model_name
-    save_config(config)
-    llm_module.model_name = model_name
+    """Setzt das Modell in der Konfiguration und speichert diese."""
+    state = load_session_state()
+    state.model = model_name
+    save_session_state(state)

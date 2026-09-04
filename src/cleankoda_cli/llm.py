@@ -1,11 +1,4 @@
-import os
-from dotenv import load_dotenv
-from mistralai.client import Mistral
+from cleankoda_cli.session_state import SessionState
+from cleankoda_cli.llm_service import stream_chat_response
 
-
-load_dotenv()  # Loads variables from .env into os.environ
-
-api_key = os.getenv("API_KEY")
-model_name = "mistral-medium-latest"
-
-client = Mistral(api_key=api_key)
+__all__ = ["SessionState", "stream_chat_response"]
