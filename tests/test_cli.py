@@ -49,6 +49,16 @@ class TestCLIDualMode(unittest.TestCase):
                     main(["--headless"])
                 self.assertEqual(cm.exception.code, 1)
 
+    def test_status_line_structure(self):
+        from cleankoda_cli.tui import status_line, update_status_line
+        update_status_line()
+        lines = status_line.text.splitlines()
+        self.assertGreaterEqual(len(lines), 2)
+        self.assertIn("Provider:", lines[0])
+        self.assertIn("Model:", lines[0])
+        self.assertEqual(lines[1], "? for shortcuts")
+        self.assertEqual(status_line.window.height, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

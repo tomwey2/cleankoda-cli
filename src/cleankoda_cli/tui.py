@@ -45,10 +45,31 @@ input_field = TextArea(
     wrap_lines=False,
 )
 
-# Unterer Bereich: Fixierte Eingabezeile
+def get_session_status_text() -> str:
+    state = SessionState.load()
+    return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature}"
+
+showing_shortcuts = False
+
+def update_status_line() -> None:
+    session_text = get_session_status_text()
+    if showing_shortcuts:
+        status_line.window.height = 5
+        status_line.text = (
+            f"{session_text}\n"
+            "Shortcuts & Hilfe (ESC zum Schließen):\n"
+            "• Enter   : Nachricht senden\n"
+            "• Ctrl+C  : App beenden\n"
+            "• Ctrl+Q  : App beenden"
+        )
+    else:
+        status_line.window.height = 2
+        status_line.text = f"{session_text}\n? for shortcuts"
+
+# Unterer Bereich: Statuszeile
 status_line = TextArea(
-    height=1,
-    text="? for shortcuts",
+    height=2,
+    text=f"{get_session_status_text()}\n? for shortcuts",
     multiline=True,
     wrap_lines=True,
 )
@@ -74,21 +95,18 @@ def _exit(event):
 
 @kb.add("?", eager=True)
 def _show_shortcuts(event):
+    global showing_shortcuts
+    showing_shortcuts = True
     input_field.read_only = True
-    status_line.window.height = 3
-    status_line.text = (
-        "Shortcuts & Hilfe (ESC zum Schließen):\n"
-        "• Enter   : Nachricht senden\n"
-        "• Ctrl+C  : App beenden\n"
-        "• Ctrl+Q  : App beenden"
-    )
+    update_status_line()
     event.app.invalidate()
 
 @kb.add("escape", eager=True)
 def _hide_shortcuts(event):
+    global showing_shortcuts
+    showing_shortcuts = False
     input_field.read_only = False
-    status_line.window.height = 1
-    status_line.text = "? for shortcuts"
+    update_status_line()
     event.app.invalidate()
 
 # 4. LLM-Stream & Agent Integration
@@ -101,6 +119,7 @@ async def stream_response(app: Application, user_text: str):
             history_area.text += f"\n\n[System]: {result.output}\n"
             history_area.buffer.cursor_position = len(history_area.text)
             app.invalidate()
+        update_status_line()
         if result.should_exit:
             app.exit()
         return
@@ -170,6 +189,7 @@ def run_headless(prompt_text: str) -> None:
 def run_tui() -> None:
     """Startet die interaktive TUI-Anwendung."""
     print("Hello from mini-code!")
+    update_status_line()
     asyncio.run(app.run_async())
 
 def main(argv: list[str] | None = None) -> None:
