@@ -6,6 +6,8 @@ from typing import Any
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
+from cleankoda_cli.credentials import CredentialsStore
+
 load_dotenv()
 
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "cleankoda"
@@ -17,7 +19,6 @@ class SessionState(BaseModel):
     model: str = "mistral-medium-latest"
     temperature: float = 0.2
     max_tokens: int = 4096
-    api_keys: dict[str, str] = Field(default_factory=dict)
 
     @property
     def litellm_model_identifier(self) -> str:
@@ -38,30 +39,14 @@ class SessionState(BaseModel):
 
         return f"{provider_lower}/{model_str}"
 
-    def get_active_api_key(self) -> str | None:
-        """Priorisiert OS-Environment-Variablen vor den in api_keys hinterlegten Werten."""
-        provider_lower = self.provider.lower()
-
-        env_key_map: dict[str, list[str]] = {
-            "anthropic": ["ANTHROPIC_API_KEY"],
-            "openai": ["OPENAI_API_KEY"],
-            "mistral": ["MISTRAL_API_KEY"],
-            "google": ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
-            "openrouter": ["OPENROUTER_API_KEY"],
-            "ollama": ["OLLAMA_API_KEY"],
-        }
-
-        keys_to_check = env_key_map.get(provider_lower, [f"{provider_lower.upper()}_API_KEY"])
-        for env_var in keys_to_check:
-            val = os.getenv(env_var)
-            if val:
-                return val
-
-        return self.api_keys.get(self.provider) or self.api_keys.get(provider_lower)
+    def get_active_api_key(self, credentials_file: Path | None = None) -> str | None:
+        """Holt den aktiven API-Key über den CredentialsStore."""
+        store = CredentialsStore.load(file_path=credentials_file)
+        return store.get_key(self.provider)
 
     @classmethod
-    def load(cls, file_path: Path | None = None) -> "SessionState":
-        """Lädt die Konfiguration aus der angegebenen JSON-Datei oder der Standardkonfigurationsdatei."""
+    def load(cls, file_path: Path | None = None, credentials_file: Path | None = None) -> "SessionState":
+        """Lädt die Konfiguration aus der angegebenen JSON-Datei (mit automatischer Migration von legacy api_keys)."""
         target_file = file_path or DEFAULT_CONFIG_FILE
         if not target_file.is_file():
             return cls()
@@ -71,7 +56,21 @@ class SessionState(BaseModel):
                 content = f.read().strip()
                 if not content:
                     return cls()
-                return cls.model_validate_json(content)
+                data = json.loads(content)
+
+            # Auto-Migration: legacy api_keys aus config.json entfernen & in CredentialsStore übertragen
+            legacy_api_keys = data.pop("api_keys", None)
+            if isinstance(legacy_api_keys, dict) and legacy_api_keys:
+                cred_store = CredentialsStore.load(file_path=credentials_file)
+                for prov, key in legacy_api_keys.items():
+                    if key and isinstance(key, str):
+                        cred_store.keys[prov.lower()] = key
+                cred_store.save(file_path=credentials_file)
+
+            state = cls.model_validate(data)
+            if legacy_api_keys is not None:
+                state.save(file_path=target_file)
+            return state
         except Exception:
             return cls()
 

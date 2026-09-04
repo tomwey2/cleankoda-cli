@@ -17,7 +17,7 @@ class TestLLMService(unittest.TestCase):
 
     def test_stream_chat_response_success(self):
         async def _test():
-            state = SessionState(provider="openai", model="gpt-4o", api_keys={"openai": "test-key"})
+            state = SessionState(provider="openai", model="gpt-4o")
             messages = [{"role": "user", "content": "Hello"}]
 
             mock_chunk1 = MagicMock()
@@ -32,7 +32,9 @@ class TestLLMService(unittest.TestCase):
                 for chunk in [mock_chunk1, mock_chunk2]:
                     yield chunk
 
-            with patch("litellm.acompletion", side_effect=mock_acompletion):
+            with patch("litellm.acompletion", side_effect=mock_acompletion), patch.object(
+                SessionState, "get_active_api_key", return_value="test-key"
+            ):
                 chunks = []
                 async for token in stream_chat_response(messages, state):
                     chunks.append(token)

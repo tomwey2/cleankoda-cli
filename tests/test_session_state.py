@@ -6,6 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
+from cleankoda_cli.credentials import CredentialsStore
 from cleankoda_cli.session_state import SessionState
 
 
@@ -17,7 +18,7 @@ class TestSessionState(unittest.TestCase):
         self.assertEqual(state.model, "mistral-medium-latest")
         self.assertEqual(state.temperature, 0.2)
         self.assertEqual(state.max_tokens, 4096)
-        self.assertEqual(state.api_keys, {})
+        self.assertFalse(hasattr(state, "api_keys"))
 
     def test_litellm_model_identifier(self):
         state = SessionState(provider="ollama", model="llama3.3")
@@ -35,15 +36,45 @@ class TestSessionState(unittest.TestCase):
         state = SessionState(provider="openai", model="gpt-4o")
         self.assertEqual(state.litellm_model_identifier, "openai/gpt-4o")
 
-    def test_get_active_api_key_env_override(self):
-        state = SessionState(provider="openai", api_keys={"openai": "key_in_state"})
-        with patch.dict(os.environ, {"OPENAI_API_KEY": "key_in_env"}):
-            self.assertEqual(state.get_active_api_key(), "key_in_env")
+    def test_get_active_api_key_delegation(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            cred_file = Path(tmpdir) / "credentials.json"
+            store = CredentialsStore(keys={"openai": "key_in_cred_store"})
+            store.save(file_path=cred_file)
 
-    def test_get_active_api_key_fallback_to_state(self):
-        state = SessionState(provider="openai", api_keys={"openai": "key_in_state"})
-        with patch.dict(os.environ, {}, clear=True):
-            self.assertEqual(state.get_active_api_key(), "key_in_state")
+            state = SessionState(provider="openai")
+
+            with patch.dict(os.environ, {}, clear=True):
+                self.assertEqual(state.get_active_api_key(credentials_file=cred_file), "key_in_cred_store")
+
+            with patch.dict(os.environ, {"OPENAI_API_KEY": "key_in_env"}):
+                self.assertEqual(state.get_active_api_key(credentials_file=cred_file), "key_in_env")
+
+    def test_legacy_api_keys_migration(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_file = Path(tmpdir) / "config.json"
+            cred_file = Path(tmpdir) / "credentials.json"
+
+            # Create legacy config.json with api_keys
+            legacy_data = {
+                "provider": "openai",
+                "model": "gpt-4o",
+                "api_keys": {"openai": "legacy-sk-openai"}
+            }
+            with open(config_file, "w", encoding="utf-8") as f:
+                json.dump(legacy_data, f)
+
+            state = SessionState.load(file_path=config_file, credentials_file=cred_file)
+            self.assertEqual(state.provider, "openai")
+
+            # Verify credentials.json received the legacy key
+            cred_store = CredentialsStore.load(file_path=cred_file)
+            self.assertEqual(cred_store.get_stored_key("openai"), "legacy-sk-openai")
+
+            # Verify config.json no longer contains api_keys
+            with open(config_file, "r", encoding="utf-8") as f:
+                new_config_data = json.load(f)
+            self.assertNotIn("api_keys", new_config_data)
 
     def test_save_and_load_persistence_and_permissions(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -53,7 +84,7 @@ class TestSessionState(unittest.TestCase):
 
             self.assertTrue(file_path.exists())
 
-            # Permissions check 0o600 (owner read/write only)
+            # Permissions check 0o600
             file_stat = file_path.stat()
             file_mode = stat.S_IMODE(file_stat.st_mode)
             self.assertEqual(file_mode, 0o600)

@@ -10,6 +10,7 @@ from prompt_toolkit.layout.layout import Layout
 
 from cleankoda_cli.commands import CommandContext, registry
 from cleankoda_cli.config import get_provider
+from cleankoda_cli.credentials import CredentialsStore
 from cleankoda_cli.memory import Memory
 
 
@@ -20,7 +21,8 @@ class TestProviderCommand(unittest.TestCase):
         cmd_names = {c.name for c in cmds}
         self.assertIn("provider", cmd_names)
 
-    def test_provider_direct_argument_valid(self):
+    @patch("cleankoda_cli.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    def test_provider_direct_argument_valid_ollama(self, mock_prompt_key):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
@@ -30,9 +32,28 @@ class TestProviderCommand(unittest.TestCase):
             with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
                 "cleankoda_cli.config.CONFIG_FILE", config_file
             ):
+                res = registry.dispatch("/provider ollama", ctx)
+                self.assertIn("Provider switched to: ollama", res.output)
+                self.assertEqual(get_provider(), "ollama")
+                mock_prompt_key.assert_not_called()
+
+    @patch("cleankoda_cli.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    def test_provider_direct_argument_with_key_prompt(self, mock_prompt_key):
+        mock_prompt_key.return_value = "sk-new-openai-key"
+        with tempfile.TemporaryDirectory() as tmpdir:
+            config_dir = Path(tmpdir) / "cleankoda"
+            config_file = config_dir / "config.json"
+            cred_file = config_dir / "credentials.json"
+            memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
+            ctx = CommandContext(memory=memory)
+
+            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda_cli.config.CONFIG_FILE", config_file
+            ), patch("cleankoda_cli.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider openai", ctx)
-                self.assertIn("Provider switched to: openai", res.output)
+                self.assertIn("API key updated. Provider switched to: openai", res.output)
                 self.assertEqual(get_provider(), "openai")
+                self.assertEqual(CredentialsStore.load(file_path=cred_file).get_stored_key("openai"), "sk-new-openai-key")
 
     def test_provider_direct_argument_invalid(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -49,22 +70,27 @@ class TestProviderCommand(unittest.TestCase):
                 self.assertIn("Available providers:", res.output)
                 self.assertIsNone(get_provider())
 
+    @patch("cleankoda_cli.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
     @patch("cleankoda_cli.commands.provider.select_provider_interactive", new_callable=AsyncMock)
-    def test_provider_interactive_selection(self, mock_select):
+    def test_provider_interactive_selection(self, mock_select, mock_prompt_key):
         mock_select.return_value = "anthropic"
+        mock_prompt_key.return_value = "sk-anthropic-123"
+
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
+            cred_file = config_dir / "credentials.json"
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
             with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
                 "cleankoda_cli.config.CONFIG_FILE", config_file
-            ):
+            ), patch("cleankoda_cli.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider", ctx)
-                self.assertIn("Provider switched to: anthropic", res.output)
+                self.assertIn("API key updated. Provider switched to: anthropic", res.output)
                 self.assertEqual(get_provider(), "anthropic")
                 mock_select.assert_called_once()
+                mock_prompt_key.assert_called_once()
 
     @patch("cleankoda_cli.commands.provider.select_provider_interactive", new_callable=AsyncMock)
     def test_provider_interactive_cancellation(self, mock_select):
@@ -94,16 +120,39 @@ class TestProviderCommand(unittest.TestCase):
             task = asyncio.create_task(_show_tui_modal_provider_dialog(app, float_container, "openai"))
             await asyncio.sleep(0.01)
 
-            # Check that float was added
             self.assertEqual(len(float_container.floats), 1)
 
-            # Simulate OK selection via keybinding (bindings[1] is enter)
             dialog_hs = float_container.floats[0].content
             dialog_kb = dialog_hs.key_bindings
             dialog_kb.bindings[1].handler(None)
 
             res = await task
             self.assertEqual(res, "openai")
+            self.assertEqual(len(float_container.floats), 0)
+
+        asyncio.run(_test())
+
+    def test_show_tui_modal_api_key_dialog(self):
+        from cleankoda_cli.commands.provider import _show_tui_modal_api_key_dialog
+
+        float_container = FloatContainer(content=Window(), floats=[])
+        layout = Layout(float_container)
+        app = Application(layout=layout)
+
+        async def _test():
+            task = asyncio.create_task(_show_tui_modal_api_key_dialog(app, float_container, "openai", "Status text"))
+            await asyncio.sleep(0.01)
+
+            self.assertEqual(len(float_container.floats), 1)
+
+            dialog_hs = float_container.floats[0].content
+            dialog_hs.input_field.text = "secret-key-123"
+
+            dialog_kb = dialog_hs.key_bindings
+            dialog_kb.bindings[1].handler(None)  # Trigger enter
+
+            res = await task
+            self.assertEqual(res, "secret-key-123")
             self.assertEqual(len(float_container.floats), 0)
 
         asyncio.run(_test())
