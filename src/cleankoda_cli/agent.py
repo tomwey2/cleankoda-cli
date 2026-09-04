@@ -14,26 +14,6 @@ Use your tools to complete the user's task, then briefly summarize what you did.
 The working directory is the folder the user launched you from."""
 
 
-def run_tool(tool_call: Any) -> str:
-    func = getattr(tool_call, "function", None)
-    if func:
-        name = func.name
-        args_str = getattr(func, "arguments", "{}")
-    else:
-        name = tool_call.get("function", {}).get("name")
-        args_str = tool_call.get("function", {}).get("arguments", "{}")
-
-    if isinstance(args_str, str):
-        args = json.loads(args_str)
-    else:
-        args = args_str
-
-    try:
-        return str(TOOLS[name](**args))
-    except Exception as error:
-        return f"Error: {error}"
-
-
 def run_agent(memory: Memory, state: SessionState | None = None) -> str | None:
     if state is None:
         state = SessionState.load()

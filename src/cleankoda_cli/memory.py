@@ -24,6 +24,15 @@ class Memory:
             if initial_messages:
                 for msg in initial_messages:
                     self.add_message(msg)
+        elif system_prompt:
+            has_system = any(
+                (isinstance(m, dict) and m.get("role") == "system")
+                or getattr(m, "role", None) == "system"
+                for m in self._messages
+            )
+            if not has_system:
+                self._messages.insert(0, {"role": "system", "content": system_prompt})
+                self._save_memory()
 
     def load_memory(self, file_path: str | Path | None = None) -> bool:
         """Load messages from a log file into memory. Returns True if loaded successfully."""

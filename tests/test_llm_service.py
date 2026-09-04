@@ -86,6 +86,73 @@ class TestLLMService(unittest.TestCase):
 
         asyncio.run(_test())
 
+    def test_stream_chat_response_tool_execution(self):
+        async def _test():
+            from cleankoda_cli.memory import Memory
+
+            state = SessionState(provider="openai", model="gpt-4o")
+            mem = Memory(system_prompt="Test")
+            mem.add_user("List files")
+
+            chunk_tool_1 = {
+                "id": "chatcmpl-1",
+                "object": "chat.completion.chunk",
+                "created": 1234,
+                "model": "gpt-4o",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": "assistant",
+                        "tool_calls": [{
+                            "index": 0,
+                            "id": "call_test123",
+                            "type": "function",
+                            "function": {"name": "list_files", "arguments": '{"path": "."}'}
+                        }]
+                    },
+                    "finish_reason": "tool_calls"
+                }]
+            }
+
+            chunk_text_2 = {
+                "id": "chatcmpl-2",
+                "object": "chat.completion.chunk",
+                "created": 1235,
+                "model": "gpt-4o",
+                "choices": [{
+                    "index": 0,
+                    "delta": {"role": "assistant", "content": "Done listing files."},
+                    "finish_reason": "stop"
+                }]
+            }
+
+            call_count = 0
+
+            async def mock_acompletion(*args, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                self.assertIn("tools", kwargs)
+                if call_count == 1:
+                    yield chunk_tool_1
+                else:
+                    yield chunk_text_2
+
+            with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
+                "cleankoda_cli.llm_service.run_tool", return_value="file1.txt\nfile2.txt"
+            ) as mock_run_tool:
+                chunks = []
+                async for token in stream_chat_response(mem, state):
+                    chunks.append(token)
+
+                output = "".join(chunks)
+                self.assertIn("Tool Execution: list_files", output)
+                self.assertIn("Tool Output", output)
+                self.assertIn("Done listing files.", output)
+                mock_run_tool.assert_called_once()
+                self.assertEqual(call_count, 2)
+
+        asyncio.run(_test())
+
 
 if __name__ == "__main__":
     unittest.main()

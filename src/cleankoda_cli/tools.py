@@ -1,5 +1,6 @@
 import os
 import subprocess
+from typing import Any
 
 def list_files(path: str = ".") -> str:
     entries = []
@@ -92,3 +93,35 @@ TOOL_SCHEMAS = [
         },
     },
 ]
+
+
+def run_tool(tool_call: Any) -> str:
+    """Führt einen Tool-Call aus und gibt das Ergebnis als String zurück."""
+    import json
+    func = getattr(tool_call, "function", None)
+    if func:
+        name = getattr(func, "name", None) or (func.get("name") if isinstance(func, dict) else None)
+        args_str = getattr(func, "arguments", "{}") or (func.get("arguments") if isinstance(func, dict) else "{}")
+    elif isinstance(tool_call, dict):
+        fn_dict = tool_call.get("function", {})
+        name = fn_dict.get("name")
+        args_str = fn_dict.get("arguments", "{}")
+    else:
+        name = None
+        args_str = "{}"
+
+    if isinstance(args_str, str):
+        try:
+            args = json.loads(args_str) if args_str else {}
+        except json.JSONDecodeError:
+            args = {}
+    else:
+        args = args_str or {}
+
+    if not name or name not in TOOLS:
+        return f"Error: Tool '{name}' not found."
+
+    try:
+        return str(TOOLS[name](**args))
+    except Exception as error:
+        return f"Error: {error}"

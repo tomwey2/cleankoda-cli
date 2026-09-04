@@ -134,7 +134,7 @@ async def stream_response(app: Application, user_text: str):
 
     state = SessionState.load()
     chunks = []
-    async for chunk in stream_chat_response(memory.messages, state):
+    async for chunk in stream_chat_response(memory, state):
         chunks.append(chunk)
         history_area.text += chunk
         history_area.buffer.cursor_position = len(history_area.text)
@@ -142,7 +142,10 @@ async def stream_response(app: Application, user_text: str):
 
     full_response = "".join(chunks)
     if full_response:
-        memory.add_assistant(full_response)
+        last_msg = memory.messages[-1] if memory.messages else None
+        last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
+        if last_role != "assistant":
+            memory.add_assistant(full_response)
 
 def accept_handler(buff):
     """Wird aufgerufen, wenn Enter gedrückt wird."""
