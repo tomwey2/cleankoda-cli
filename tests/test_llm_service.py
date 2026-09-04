@@ -149,8 +149,8 @@ class TestLLMService(unittest.TestCase):
                     chunks.append(token)
 
                 output = "".join(chunks)
-                self.assertIn("Tool Execution: list_files", output)
-                self.assertIn("Tool Output", output)
+                self.assertIn("list_files(.)", output)
+                self.assertNotIn("Tool Output", output)
                 self.assertIn("Done listing files.", output)
                 mock_run_tool.assert_called_once()
                 self.assertEqual(call_count, 2)

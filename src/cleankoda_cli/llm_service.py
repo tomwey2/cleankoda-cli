@@ -17,6 +17,42 @@ from cleankoda_cli.tools import TOOL_SCHEMAS, run_tool
 litellm.suppress_debug_info = True
 
 
+def format_tool_call_display(func_name: str, func_args: Any) -> str:
+    """Format function name and primary parameter for display."""
+    import json
+
+    args_dict = {}
+    if isinstance(func_args, str):
+        try:
+            args_dict = json.loads(func_args) if func_args else {}
+        except Exception:
+            args_dict = {}
+    elif isinstance(func_args, dict):
+        args_dict = func_args
+
+    if not isinstance(args_dict, dict):
+        return f"{func_name}({func_args})"
+
+    path_val = args_dict.get("path") or args_dict.get("file_path") or args_dict.get("filepath")
+    if path_val:
+        return f"{func_name}({path_val})"
+
+    if "command" in args_dict:
+        return f"{func_name}({args_dict['command']})"
+
+    if "url" in args_dict:
+        return f"{func_name}({args_dict['url']})"
+
+    if len(args_dict) == 1:
+        val = next(iter(args_dict.values()))
+        return f"{func_name}({val})"
+
+    if isinstance(func_args, str) and func_args:
+        return f"{func_name}({func_args})"
+
+    return f"{func_name}()"
+
+
 async def stream_chat_response(
     messages: list[dict[str, Any]] | Any,
     state: SessionState,
@@ -133,11 +169,10 @@ async def stream_chat_response(
             func_args = getattr(func, "arguments", "") if func else ""
             tool_call_id = getattr(tool_call, "id", "") or f"call_{func_name}"
 
-            yield f"\n[Tool Execution: {func_name}({func_args})]\n"
+            display_str = format_tool_call_display(func_name, func_args)
+            yield f"{display_str}\n"
 
             tool_result = run_tool(tool_call)
-
-            yield f"[Tool Output]: {tool_result}\n"
 
             tool_msg = {
                 "role": "tool",
