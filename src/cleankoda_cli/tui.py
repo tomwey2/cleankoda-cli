@@ -13,9 +13,9 @@ from cleankoda_cli.memory import Memory
 from cleankoda_cli.session_state import SessionState
 
 BANNER = """
- ▄▄▄▄ █ ▄▄▄  ▄▄▄  ▄▄▄  █ ▄  ▄▄▄▄ ▄▄▄█  ▄▄▄
- █    █ █▀▀ █  █  █  █ █▀▄  █  █ █  █ █  █
- ▀▀▀▀ ▀ ▀▀▀ ▀▀▀▀▀ ▀  ▀ ▀  ▀ ▀▀▀▀ ▀▀▀▀ ▀▀▀▀▀
+  ▄▄▄ █  ▄▄▄   ▄▄▄  ▄▄▄▄  █  ▄  ▄▄▄  ▄▄▄█  ▄▄▄
+ █    █ █▄▄▄█  ▄▄▄█ █   █ █▄▀  █   █ █  █  ▄▄▄█
+ ▀▄▄▄ █ ▀▄▄▄▄ ▀▄▄▄█ █   █ █ ▀▄ ▀▄▄▄▀ █▄▄█ ▀▄▄▄█
 """
 
 
