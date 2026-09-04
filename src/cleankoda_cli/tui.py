@@ -62,7 +62,7 @@ class TUI:
 
         self.status_line = TextArea(
             height=2,
-            text=f"{self.get_session_status_text()}\nCtrl+H for shortcuts",
+            text=f"{self.get_session_status_text()}\nCtrl+O for shortcuts",
             multiline=True,
             wrap_lines=True,
         )
@@ -106,7 +106,7 @@ class TUI:
             )
         else:
             self.status_line.window.height = 2
-            self.status_line.text = f"{session_text}\nCtrl+H for shortcuts"
+            self.status_line.text = f"{session_text}\nCtrl+O for shortcuts"
 
     def _register_keybindings(self) -> None:
         @self.kb.add("c-c")
@@ -114,7 +114,7 @@ class TUI:
         def _exit(event):
             event.app.exit()
 
-        @self.kb.add("c-h", eager=True)
+        @self.kb.add("c-o", eager=True)
         def _show_shortcuts(event):
             self.showing_shortcuts = True
             self.input_field.read_only = True
