@@ -7,32 +7,40 @@ from cleankoda_cli.memory import Memory
 from cleankoda_cli.tui import run_tui
 
 
-def run_headless(prompt_text: str, mem: Memory) -> None:
-    """Führt den Prompt im Headless-Modus (ohne TUI) aus."""
+def run_headless(prompt_text: str, memory: Memory) -> int:
+    """Execute the prompt in headless mode without TUI.
+
+    Returns exit code 0 on success, or 1 on failure.
+    """
     # Slash-Command Check
     if prompt_text.startswith("/"):
-        ctx = CommandContext(memory=mem)
+        ctx = CommandContext(memory=memory)
         result = registry.dispatch(prompt_text, ctx)
         if result.output:
             print(result.output)
-        return
+        return 0
 
-    mem.add_user(prompt_text)
-    response = run_agent(mem)
-    if response:
-        print(response)
+    memory.add_user(prompt_text)
+    try:
+        response = run_agent(memory)
+        if response:
+            print(response)
+        return 0
+    except Exception as e:
+        print(f"Error running agent: {e}", file=sys.stderr)
+        return 1
 
 
 def main(argv: list[str] | None = None) -> None:
-    memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
-
     parser = argparse.ArgumentParser(description="cleankoda CLI")
+    mode_group = parser.add_mutually_exclusive_group()
+    mode_group.add_argument("--tui", action="store_true", help="Force TUI mode")
+    mode_group.add_argument("--headless", action="store_true", help="Force headless mode")
     parser.add_argument("prompt_pos", nargs="*", help="Optionaler Prompt (Headless)")
     parser.add_argument("-p", "--prompt", help="Prompt für den Headless-Modus")
-    parser.add_argument("--headless", action="store_true", help="Erzwingt Headless-Modus")
-    parser.add_argument("--tui", action="store_true", help="Erzwingt TUI-Modus")
 
     args = parser.parse_args(argv)
+
     prompt_parts = args.prompt_pos if args.prompt_pos else []
     pos_prompt = " ".join(prompt_parts).strip() if prompt_parts else None
     prompt = args.prompt or pos_prompt
@@ -41,10 +49,15 @@ def main(argv: list[str] | None = None) -> None:
     if not sys.stdin.isatty():
         try:
             piped_input = sys.stdin.read().strip()
-        except OSError:
-            piped_input = None
+        except OSError as err:
+            print(f"Warning: Could not read standard input: {err}", file=sys.stderr)
 
-    final_prompt = prompt or piped_input
+    if prompt and piped_input:
+        final_prompt = f"{prompt}\n\n{piped_input}"
+    else:
+        final_prompt = prompt or piped_input
+
+    memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
 
     if args.tui:
         run_tui(memory)
@@ -52,7 +65,9 @@ def main(argv: list[str] | None = None) -> None:
         if not final_prompt:
             print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
             sys.exit(1)
-        run_headless(final_prompt, memory)
+        code = run_headless(final_prompt, memory)
+        if code != 0:
+            sys.exit(code)
     else:
         run_tui(memory)
 
