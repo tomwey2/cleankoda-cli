@@ -77,9 +77,14 @@ def get_provider() -> str | None:
 
 
 def set_provider(provider_name: str) -> None:
-    """Setzt den Provider in der Konfiguration und speichert diese."""
+    """Setzt den Provider in der Konfiguration und speichert diese.
+    Setzt das Modell auf das erste Modell in der Liste des jeweiligen Providers.
+    """
     state = load_session_state()
     state.provider = provider_name
+    models = get_models_for_provider(provider_name)
+    if models:
+        state.model = models[0]
     save_session_state(state)
 
 

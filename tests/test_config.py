@@ -56,13 +56,16 @@ class TestConfig(unittest.TestCase):
             ):
                 set_provider("anthropic")
                 self.assertEqual(get_provider(), "anthropic")
+                self.assertEqual(get_model(), "claude-3-5-sonnet-latest")
 
                 set_provider("mistral")
                 self.assertEqual(get_provider(), "mistral")
+                self.assertEqual(get_model(), "mistral-small-latest")
 
                 with open(config_file, "r", encoding="utf-8") as f:
                     content = json.load(f)
                 self.assertEqual(content.get("provider"), "mistral")
+                self.assertEqual(content.get("model"), "mistral-small-latest")
 
     def test_get_models_for_provider(self):
         with tempfile.TemporaryDirectory() as tmpdir:
