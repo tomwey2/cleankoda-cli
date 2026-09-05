@@ -1,10 +1,10 @@
 import argparse
 import sys
 
-from cleankoda_cli.agent import SYSTEM_PROMPT, run_agent
-from cleankoda_cli.commands import CommandContext, registry
-from cleankoda_cli.memory import Memory
-from cleankoda_cli.tui import run_tui
+from cleankoda.agent import SYSTEM_PROMPT, run_agent
+from cleankoda.commands import CommandContext, registry
+from cleankoda.memory import Memory
+from cleankoda.tui import run_tui
 
 
 def run_headless(prompt_text: str, memory: Memory) -> int:

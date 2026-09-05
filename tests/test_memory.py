@@ -2,7 +2,7 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
-from cleankoda_cli.memory import Memory
+from cleankoda.memory import Memory
 
 
 class TestMemory(unittest.TestCase):

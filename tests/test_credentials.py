@@ -5,7 +5,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from cleankoda_cli.credentials import CredentialsStore
+from cleankoda.credentials import CredentialsStore
 
 
 class TestCredentialsStore(unittest.TestCase):

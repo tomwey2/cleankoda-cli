@@ -3,10 +3,10 @@ import os
 from typing import Any
 import litellm
 
-from cleankoda_cli.commands import CommandContext, registry
-from cleankoda_cli.session_state import SessionState
-from cleankoda_cli.memory import Memory
-from cleankoda_cli.tools import *
+from cleankoda.commands import CommandContext, registry
+from cleankoda.session_state import SessionState
+from cleankoda.memory import Memory
+from cleankoda.tools import *
 
 SYSTEM_PROMPT = """You are a coding agent running in the user's terminal.
 You can list files, read files, write files, and run shell commands.

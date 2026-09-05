@@ -6,9 +6,9 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.shortcuts import input_dialog, radiolist_dialog
 from prompt_toolkit.widgets import Button, Dialog, RadioList, TextArea
 
-from cleankoda_cli.commands.registry import CommandContext, CommandResult, registry
-from cleankoda_cli.config import PROVIDERS, get_provider, set_provider
-from cleankoda_cli.credentials import CredentialsStore
+from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.config import PROVIDERS, get_provider, set_provider
+from cleankoda.credentials import CredentialsStore
 
 
 async def _show_tui_modal_provider_dialog(

@@ -1,10 +1,10 @@
 [project]
-name = "cleankoda-cli"
+name = "cleankoda"
 version = "0.1.0"
 description = "Coding agent harness for clean code software development"
 readme = "README.md"
 authors = [
-    { name = "Thomas", email = "tomwey2@gmail.com" }
+    { name = "Thomas Weyrath", email = "tomwey2@gmail.com" }
 ]
 requires-python = ">=3.11"
 dependencies = [
@@ -16,7 +16,7 @@ dependencies = [
 ]
 
 [project.scripts]
-cleankoda-cli = "cleankoda_cli.main:main"
+cleankoda = "cleankoda.main:main"
 
 [build-system]
 requires = ["uv_build>=0.9.7,<0.10.0"]

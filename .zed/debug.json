@@ -1,9 +1,9 @@
 [
   {
-    "label": "Debug cleankoda-cli",
+    "label": "Debug cleankoda",
     "adapter": "Debugpy",
     "request": "launch",
-    "module": "cleankoda_cli.tui",
+    "module": "cleankoda.main",
     "python": "$ZED_WORKTREE_ROOT/.venv/bin/python",
     "cwd": "$ZED_WORKTREE_ROOT"
   },

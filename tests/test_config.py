@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from cleankoda_cli.config import (
+from cleankoda.config import (
     PROVIDER_MODELS,
     get_model,
     get_models_for_provider,
@@ -22,8 +22,8 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 config = load_config()
                 self.assertEqual(config, {})
@@ -33,8 +33,8 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 self.assertFalse(config_dir.exists())
                 save_config({"provider": "openai", "custom": "value"})
@@ -51,8 +51,8 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 set_provider("anthropic")
                 self.assertEqual(get_provider(), "anthropic")
@@ -71,8 +71,8 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 self.assertIn("gpt-4o", get_models_for_provider("openai"))
                 self.assertIn("claude-3-5-sonnet-latest", get_models_for_provider("anthropic"))
@@ -84,8 +84,8 @@ class TestConfig(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 set_model("gpt-4o")
                 self.assertEqual(get_model(), "gpt-4o")

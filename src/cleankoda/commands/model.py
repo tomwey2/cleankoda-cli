@@ -5,8 +5,8 @@ from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.widgets import Button, Dialog, RadioList
 
-from cleankoda_cli.commands.registry import CommandContext, CommandResult, registry
-from cleankoda_cli.config import get_model, get_models_for_provider, get_provider, set_model
+from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.config import get_model, get_models_for_provider, get_provider, set_model
 
 
 async def _show_tui_modal_model_dialog(

@@ -11,8 +11,8 @@ from litellm.exceptions import (
     ServiceUnavailableError,
 )
 
-from cleankoda_cli.session_state import SessionState
-from cleankoda_cli.tools import TOOL_SCHEMAS, run_tool
+from cleankoda.session_state import SessionState
+from cleankoda.tools import TOOL_SCHEMAS, run_tool
 
 litellm.suppress_debug_info = True
 

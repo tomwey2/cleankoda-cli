@@ -6,8 +6,8 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from cleankoda_cli.credentials import CredentialsStore
-from cleankoda_cli.session_state import SessionState
+from cleankoda.credentials import CredentialsStore
+from cleankoda.session_state import SessionState
 
 
 class TestSessionState(unittest.TestCase):
