@@ -49,7 +49,7 @@ class ChatLexer(Lexer):
 
 
 class TUI:
-    """Terminal User Interface application for cleankoda-cli."""
+    """Terminal User Interface application for cleankoda cli."""
 
     def __init__(self, memory: Memory) -> None:
         self.memory = memory
@@ -58,7 +58,7 @@ class TUI:
 
         self.history_area = TextArea(
             text=BANNER
-            + " Welcome to cleankoda-cli!\n"
+            + " Welcome to cleankoda!\n"
             + " The coding agent for clean code software development.\n"
             + ("─" * 60)
             + "\n",
