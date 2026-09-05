@@ -1,13 +1,18 @@
 import asyncio
 import re
 from prompt_toolkit.application import Application
+from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
+from prompt_toolkit.completion import Completer, Completion
+from prompt_toolkit.filters import completion_is_selected, has_completions
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.layout.containers import FloatContainer, HSplit
+from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.layout.layout import Layout
+from prompt_toolkit.layout.menus import CompletionsMenu
 from prompt_toolkit.lexers import Lexer
+from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
-from cleankoda.commands import CommandContext, registry
+from cleankoda.commands import SLASH_COMMANDS, CommandContext, registry
 from cleankoda.llm_service import stream_chat_response
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState
@@ -17,6 +22,42 @@ BANNER = """
  █    █ █▄▄▄█  ▄▄▄█ █   █ █▄▀  █   █ █  █  ▄▄▄█
  ▀▄▄▄ █ ▀▄▄▄▄ ▀▄▄▄█ █   █ █ ▀▄ ▀▄▄▄▀ █▄▄█ ▀▄▄▄█
 """
+
+TUI_STYLE = Style.from_dict({
+    "completion-menu": "bg:#222222 #ffffff",
+    "completion-menu.completion": "bg:#222222 #ffffff",
+    "completion-menu.completion.current": "bg:#005f87 #ffffff bold",
+    "completion-menu.meta": "bg:#333333 #aaaaaa",
+    "completion-menu.completion.current.meta": "bg:#0087af #ffffff",
+})
+
+
+class SlashCommandCompleter(Completer):
+    """Autocompleter for slash commands in the TUI input line."""
+
+    def __init__(self, commands: dict[str, str] | None = None) -> None:
+        self.commands = commands if commands is not None else SLASH_COMMANDS
+
+    def get_completions(self, document, complete_event):
+        text_before_cursor = document.text_before_cursor
+        if text_before_cursor.endswith((" ", "\t", "\n")):
+            word = ""
+        else:
+            words = text_before_cursor.split()
+            word = words[-1] if words else text_before_cursor
+
+        if not word.startswith("/"):
+            return
+
+        word_lower = word.lower()
+        for cmd, desc in self.commands.items():
+            if cmd.lower().startswith(word_lower):
+                yield Completion(
+                    text=cmd,
+                    start_position=-len(word),
+                    display=cmd,
+                    display_meta=desc,
+                )
 
 
 class ChatLexer(Lexer):
@@ -74,6 +115,9 @@ class TUI:
             prompt="> ",
             multiline=False,
             wrap_lines=False,
+            completer=SlashCommandCompleter(),
+            complete_while_typing=True,
+            auto_suggest=AutoSuggestFromHistory(),
         )
 
         self.status_line = TextArea(
@@ -89,7 +133,16 @@ class TUI:
             self.status_line,
         ])
 
-        self.float_container = FloatContainer(content=self.root_container, floats=[])
+        self.float_container = FloatContainer(
+            content=self.root_container,
+            floats=[
+                Float(
+                    content=CompletionsMenu(max_height=8, scroll_offset=1),
+                    xcursor=True,
+                    ycursor=True,
+                )
+            ],
+        )
         self.layout = Layout(self.float_container, focused_element=self.input_field)
 
         self.kb = KeyBindings()
@@ -102,6 +155,7 @@ class TUI:
             key_bindings=self.kb,
             full_screen=True,
             mouse_support=True,
+            style=TUI_STYLE,
         )
         self.app.float_container = self.float_container
 
@@ -138,12 +192,25 @@ class TUI:
             event.app.invalidate()
 
         @self.kb.add("escape", eager=True)
-        def _hide_shortcuts(event):
+        def _handle_escape(event):
+            if self.input_field.text.lstrip().startswith("/"):
+                self.input_field.text = ""
             self.showing_shortcuts = False
             if not self.is_processing:
                 self.input_field.read_only = False
             self.update_status_line()
             event.app.invalidate()
+
+        @self.kb.add("enter", filter=has_completions | completion_is_selected)
+        def _accept_completion(event):
+            buff = event.current_buffer
+            if buff.complete_state:
+                completion = buff.complete_state.current_completion
+                if completion is None and buff.complete_state.completions:
+                    completion = buff.complete_state.completions[0]
+                if completion:
+                    buff.apply_completion(completion)
+                buff.complete_state = None
 
     def _accept_handler(self, buff) -> None:
         if self.input_field.read_only or self.is_processing:
