@@ -1,6 +1,6 @@
-from cleankoda_cli.commands.registry import CommandContext, CommandResult, registry
-from cleankoda_cli.config import CONFIG_FILE
-from cleankoda_cli.session_state import SessionState
+from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.config import CONFIG_FILE
+from cleankoda.session_state import SessionState
 
 
 @registry.register(

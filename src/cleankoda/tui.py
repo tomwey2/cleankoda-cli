@@ -7,10 +7,10 @@ from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.widgets import Frame, TextArea
 
-from cleankoda_cli.commands import CommandContext, registry
-from cleankoda_cli.llm_service import stream_chat_response
-from cleankoda_cli.memory import Memory
-from cleankoda_cli.session_state import SessionState
+from cleankoda.commands import CommandContext, registry
+from cleankoda.llm_service import stream_chat_response
+from cleankoda.memory import Memory
+from cleankoda.session_state import SessionState
 
 BANNER = """
   ▄▄▄ █  ▄▄▄   ▄▄▄  ▄▄▄▄  █  ▄  ▄▄▄  ▄▄▄█  ▄▄▄

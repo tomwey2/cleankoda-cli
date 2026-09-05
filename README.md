@@ -53,7 +53,7 @@ cleankoda-cli
 
 - **Positional Prompt Argument**:
   ```bash
-  cleankoda-cli "Explain the main function in src/cleankoda_cli/tui.py"
+  cleankoda-cli "Explain the main function in src/cleankoda/tui.py"
   ```
 
 - **Prompt Flag (`-p` / `--prompt`)**:
@@ -63,7 +63,7 @@ cleankoda-cli
 
 - **Piped Standard Input**:
   ```bash
-  cat src/cleankoda_cli/tui.py | cleankoda-cli "Review this file for potential bugs"
+  cat src/cleankoda/tui.py | cleankoda-cli "Review this file for potential bugs"
   ```
 
 - **Force Execution Mode Flags**:

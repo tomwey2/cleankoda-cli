@@ -2,7 +2,7 @@ import json
 from pathlib import Path
 from typing import Any
 
-from cleankoda_cli.session_state import SessionState
+from cleankoda.session_state import SessionState
 
 CONFIG_DIR = Path.home() / ".config" / "cleankoda"
 CONFIG_FILE = CONFIG_DIR / "config.json"

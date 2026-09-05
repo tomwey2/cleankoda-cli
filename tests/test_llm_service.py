@@ -9,8 +9,8 @@ from litellm.exceptions import (
     APIConnectionError,
 )
 
-from cleankoda_cli.llm_service import stream_chat_response
-from cleankoda_cli.session_state import SessionState
+from cleankoda.llm_service import stream_chat_response
+from cleankoda.session_state import SessionState
 
 
 class TestLLMService(unittest.TestCase):
@@ -90,7 +90,7 @@ class TestLLMService(unittest.TestCase):
         async def _test():
             import tempfile
             from pathlib import Path
-            from cleankoda_cli.memory import Memory
+            from cleankoda.memory import Memory
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 file_path = Path(tmpdir) / "memory.json"
@@ -142,7 +142,7 @@ class TestLLMService(unittest.TestCase):
                     yield chunk_text_2
 
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
-                "cleankoda_cli.llm_service.run_tool", return_value="file1.txt\nfile2.txt"
+                "cleankoda.llm_service.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
                 async for token in stream_chat_response(mem, state):

@@ -3,14 +3,14 @@ import sys
 import unittest
 from unittest.mock import patch, MagicMock, ANY
 
-from cleankoda_cli.main import main, run_headless
+from cleankoda.main import main, run_headless
 
 class TestMainDualMode(unittest.TestCase):
 
     def test_run_headless_slash_command(self):
         import tempfile
         from pathlib import Path
-        from cleankoda_cli.memory import Memory
+        from cleankoda.memory import Memory
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
@@ -21,11 +21,11 @@ class TestMainDualMode(unittest.TestCase):
             self.assertIn("Available Commands:", output)
             self.assertIn("/exit", output)
 
-    @patch("cleankoda_cli.main.run_agent")
+    @patch("cleankoda.main.run_agent")
     def test_run_headless_agent_call(self, mock_run_agent):
         import tempfile
         from pathlib import Path
-        from cleankoda_cli.memory import Memory
+        from cleankoda.memory import Memory
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
@@ -37,17 +37,17 @@ class TestMainDualMode(unittest.TestCase):
             self.assertIn("Test response from agent", output)
             mock_run_agent.assert_called_once()
 
-    @patch("cleankoda_cli.main.run_headless")
+    @patch("cleankoda.main.run_headless")
     def test_main_with_positional_prompt(self, mock_run_headless):
         main(["Explain", "this", "code"])
         mock_run_headless.assert_called_once_with("Explain this code", ANY)
 
-    @patch("cleankoda_cli.main.run_tui")
+    @patch("cleankoda.main.run_tui")
     def test_main_with_tui_flag(self, mock_run_tui):
         main(["--tui"])
         mock_run_tui.assert_called_once()
 
-    @patch("cleankoda_cli.main.run_headless")
+    @patch("cleankoda.main.run_headless")
     def test_main_with_piped_input(self, mock_run_headless):
         with patch("sys.stdin.isatty", return_value=False):
             with patch("sys.stdin.read", return_value="Piped input prompt"):
@@ -64,8 +64,8 @@ class TestMainDualMode(unittest.TestCase):
     def test_status_line_structure(self):
         import tempfile
         from pathlib import Path
-        from cleankoda_cli.memory import Memory
-        from cleankoda_cli.tui import TUI
+        from cleankoda.memory import Memory
+        from cleankoda.tui import TUI
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")

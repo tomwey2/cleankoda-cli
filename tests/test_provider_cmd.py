@@ -8,10 +8,10 @@ from prompt_toolkit.application import Application
 from prompt_toolkit.layout.containers import FloatContainer, Window
 from prompt_toolkit.layout.layout import Layout
 
-from cleankoda_cli.commands import CommandContext, registry
-from cleankoda_cli.config import get_provider
-from cleankoda_cli.credentials import CredentialsStore
-from cleankoda_cli.memory import Memory
+from cleankoda.commands import CommandContext, registry
+from cleankoda.config import get_provider
+from cleankoda.credentials import CredentialsStore
+from cleankoda.memory import Memory
 
 
 class TestProviderCommand(unittest.TestCase):
@@ -21,7 +21,7 @@ class TestProviderCommand(unittest.TestCase):
         cmd_names = {c.name for c in cmds}
         self.assertIn("provider", cmd_names)
 
-    @patch("cleankoda_cli.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
     def test_provider_direct_argument_valid_ollama(self, mock_prompt_key):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
@@ -29,15 +29,15 @@ class TestProviderCommand(unittest.TestCase):
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 res = registry.dispatch("/provider ollama", ctx)
                 self.assertIn("Provider switched to: ollama", res.output)
                 self.assertEqual(get_provider(), "ollama")
                 mock_prompt_key.assert_not_called()
 
-    @patch("cleankoda_cli.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
     def test_provider_direct_argument_with_key_prompt(self, mock_prompt_key):
         mock_prompt_key.return_value = "sk-new-openai-key"
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -47,9 +47,9 @@ class TestProviderCommand(unittest.TestCase):
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
-            ), patch("cleankoda_cli.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
+            ), patch("cleankoda.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider openai", ctx)
                 self.assertIn("API key updated. Provider switched to: openai", res.output)
                 self.assertEqual(get_provider(), "openai")
@@ -62,16 +62,16 @@ class TestProviderCommand(unittest.TestCase):
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 res = registry.dispatch("/provider unknown_llm", ctx)
                 self.assertIn("Invalid provider 'unknown_llm'", res.output)
                 self.assertIn("Available providers:", res.output)
                 self.assertIsNone(get_provider())
 
-    @patch("cleankoda_cli.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
-    @patch("cleankoda_cli.commands.provider.select_provider_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.provider.select_provider_interactive", new_callable=AsyncMock)
     def test_provider_interactive_selection(self, mock_select, mock_prompt_key):
         mock_select.return_value = "anthropic"
         mock_prompt_key.return_value = "sk-anthropic-123"
@@ -83,16 +83,16 @@ class TestProviderCommand(unittest.TestCase):
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
-            ), patch("cleankoda_cli.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
+            ), patch("cleankoda.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider", ctx)
                 self.assertIn("API key updated. Provider switched to: anthropic", res.output)
                 self.assertEqual(get_provider(), "anthropic")
                 mock_select.assert_called_once()
                 mock_prompt_key.assert_called_once()
 
-    @patch("cleankoda_cli.commands.provider.select_provider_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.provider.select_provider_interactive", new_callable=AsyncMock)
     def test_provider_interactive_cancellation(self, mock_select):
         mock_select.return_value = None  # User pressed ESC
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -101,8 +101,8 @@ class TestProviderCommand(unittest.TestCase):
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda_cli.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda_cli.config.CONFIG_FILE", config_file
+            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
+                "cleankoda.config.CONFIG_FILE", config_file
             ):
                 res = registry.dispatch("/provider", ctx)
                 self.assertIn("Provider selection cancelled.", res.output)
@@ -110,7 +110,7 @@ class TestProviderCommand(unittest.TestCase):
                 mock_select.assert_called_once()
 
     def test_show_tui_modal_provider_dialog(self):
-        from cleankoda_cli.commands.provider import _show_tui_modal_provider_dialog
+        from cleankoda.commands.provider import _show_tui_modal_provider_dialog
 
         float_container = FloatContainer(content=Window(), floats=[])
         layout = Layout(float_container)
@@ -133,7 +133,7 @@ class TestProviderCommand(unittest.TestCase):
         asyncio.run(_test())
 
     def test_show_tui_modal_api_key_dialog(self):
-        from cleankoda_cli.commands.provider import _show_tui_modal_api_key_dialog
+        from cleankoda.commands.provider import _show_tui_modal_api_key_dialog
 
         float_container = FloatContainer(content=Window(), floats=[])
         layout = Layout(float_container)

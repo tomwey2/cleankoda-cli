@@ -2,8 +2,8 @@ import unittest
 import tempfile
 from pathlib import Path
 
-from cleankoda_cli.commands import CommandContext, registry
-from cleankoda_cli.memory import Memory
+from cleankoda.commands import CommandContext, registry
+from cleankoda.memory import Memory
 
 
 class TestCommandRegistry(unittest.TestCase):

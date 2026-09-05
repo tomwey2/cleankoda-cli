@@ -6,7 +6,7 @@ from typing import Any
 from dotenv import load_dotenv
 from pydantic import BaseModel, Field
 
-from cleankoda_cli.credentials import CredentialsStore
+from cleankoda.credentials import CredentialsStore
 
 load_dotenv()
 
