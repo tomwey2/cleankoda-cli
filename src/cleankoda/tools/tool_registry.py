@@ -9,18 +9,18 @@ from cleankoda.tools.host_runner import HostRunner
 # Instanzen für den aktuellen Projektordner
 workspace = Path.cwd()
 fs = JailedFilesystem(workspace_root=workspace)
-sandbox = DockerSandbox(workspace_path=workspace)
 host_runner = HostRunner(workspace_path=workspace)
+sandbox = DockerSandbox(workspace_path=workspace, image="python:3.11-slim")
+active_runner = sandbox
 use_sandbox = True
+active_image = "python:3.11-slim"
 
 async def dispatch_bash(command: str, timeout: int = 30) -> str:
     """
     Dynamischer Dispatcher für Shell-Befehle:
-    Leitet das Kommando je nach aktuellem Flag an die Docker-Sandbox
-    oder den Host-Runner weiter. Beide Schnittstellen sind asynchron.
+    Leitet das Kommando an den aktuell aktiven Runner (Docker-Sandbox oder Host-Runner) weiter.
     """
-    runner = sandbox if use_sandbox else host_runner
-    return await runner.execute(command=command, timeout=timeout)
+    return await active_runner.execute(command=command, timeout=timeout)
 
 # Das einheitliche, rein asynchrone Tool-Dictionary
 AsyncToolCallable = Callable[..., Coroutine[Any, Any, str]]
@@ -128,9 +128,50 @@ async def run_tool(tool_call: Any) -> str:
         return f"Error: {error}"
 
 
+def switch_runner(use_sandbox_param: bool, image: str | None = None) -> str:
+    """
+    Safely stop current runner and switch to Docker Sandbox or HostRunner.
+    Returns status message or error detail.
+    """
+    global active_runner, use_sandbox, active_image, sandbox
+
+    if hasattr(active_runner, "stop"):
+        try:
+            active_runner.stop()
+        except Exception:
+            pass
+
+    if use_sandbox_param and image and image != "host":
+        try:
+            new_sandbox = DockerSandbox(workspace_path=workspace, image=image)
+            new_sandbox.start()
+            sandbox = new_sandbox
+            active_runner = sandbox
+            use_sandbox = True
+            active_image = image
+            return f"Sandbox aktiv: Image [{image}]"
+        except Exception as exc:
+            active_runner = host_runner
+            use_sandbox = False
+            active_image = "host"
+            return f"Fehler beim Starten der Sandbox ({exc}). Fallback auf Host-System."
+    else:
+        active_runner = host_runner
+        use_sandbox = False
+        active_image = "host"
+        return "Sandbox deaktiviert: Befehle laufen direkt auf dem Host."
+
+
+def get_sandbox_status() -> str:
+    """Return active image name or 'host' for status line display."""
+    if use_sandbox and active_image:
+        return active_image
+    return "host"
+
+
 def toggle_sandbox(enabled: bool) -> str:
-    global use_sandbox
-    use_sandbox = enabled
-    if enabled and not sandbox.container:
-        sandbox.start()
-    return f"Sandbox ist nun {'aktiviert' if enabled else 'deaktiviert'}."
+    if enabled:
+        return switch_runner(True, active_image or "python:3.11-slim")
+    else:
+        return switch_runner(False)
+

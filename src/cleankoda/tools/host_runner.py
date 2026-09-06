@@ -5,7 +5,10 @@ from pathlib import Path
 from typing import Any, Dict
 
 
-class HostRunner:
+from .base_runner import BashRunner
+
+
+class HostRunner(BashRunner):
     """Führt Bash-Befehle direkt auf dem Host-System im Workspace aus."""
 
     def __init__(self, workspace_path: Path, max_output_chars: int = 12000):

@@ -16,6 +16,7 @@ from cleankoda.commands import CommandContext, registry
 from cleankoda.llm_service import stream_chat_response
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState
+from cleankoda.tools import get_sandbox_status
 
 BANNER = """
   ▄▄▄ █  ▄▄▄   ▄▄▄  ▄▄▄▄  █  ▄  ▄▄▄  ▄▄▄█  ▄▄▄
@@ -47,6 +48,20 @@ class SlashCommandCompleter(Completer):
 
     def get_completions(self, document, complete_event):
         text_before_cursor = document.text_before_cursor
+
+        if text_before_cursor.startswith("/sandbox "):
+            parts = text_before_cursor.split()
+            word = parts[-1] if len(parts) > 1 and not text_before_cursor.endswith(" ") else ""
+            word_lower = word.lower()
+            if "off".startswith(word_lower):
+                yield Completion(
+                    text="off",
+                    start_position=-len(word),
+                    display="off",
+                    display_meta="Sandbox deaktivieren (HostRunner)",
+                )
+            return
+
         if text_before_cursor.endswith((" ", "\t", "\n")):
             word = ""
         else:
@@ -169,7 +184,8 @@ class TUI:
 
     def get_session_status_text(self) -> str:
         state = SessionState.load()
-        return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature}"
+        sb_status = get_sandbox_status()
+        return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature} | Sandbox: {sb_status}"
 
     def update_status_line(self) -> None:
         session_text = self.get_session_status_text()
