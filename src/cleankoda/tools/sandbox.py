@@ -6,8 +6,9 @@ from typing import Any, Dict, Optional
 import docker
 from docker.errors import DockerException
 
+from .base_runner import BashRunner
 
-class DockerSandbox:
+class DockerSandbox(BashRunner):
     """
     Isolierte Docker-Ausführungsumgebung für Bash-Kommandos eines Coding-Agenten.
 
@@ -26,11 +27,10 @@ class DockerSandbox:
         memory_limit: str = "2g",
         max_output_chars: int = 12000,
     ):
-        self.workspace_path = workspace_path.resolve()
+        super().__init__(workspace_path, max_output_chars)
         self.image = image
         self.network_enabled = network_enabled
         self.memory_limit = memory_limit
-        self.max_output_chars = max_output_chars
 
         self.client = docker.from_env()
         self.container = None

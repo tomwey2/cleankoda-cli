@@ -9,8 +9,7 @@ class HostRunner:
     """Führt Bash-Befehle direkt auf dem Host-System im Workspace aus."""
 
     def __init__(self, workspace_path: Path, max_output_chars: int = 12000):
-        self.workspace_path = workspace_path.resolve()
-        self.max_output_chars = max_output_chars
+        super().__init__(workspace_path, max_output_chars)
 
     async def execute_async(self, command: str, timeout: int = 30) -> Dict[str, Any]:
         """Führt ein Kommando asynchron als Subprozess auf dem Host aus."""
