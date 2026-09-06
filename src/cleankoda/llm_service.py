@@ -184,7 +184,7 @@ async def stream_chat_response(
             display_str = format_tool_call_display(func_name, func_args)
             yield f"{display_str}\n"
 
-            tool_result = run_tool(tool_call)
+            tool_result = await run_tool(tool_call)
 
             tool_msg = {
                 "role": "tool",

@@ -1,44 +1,44 @@
-import os
+from pathlib import Path
 import subprocess
-from typing import Any
+from typing import Any, Callable, Coroutine
 
-def list_files(path: str = ".") -> str:
-    entries = []
-    for entry in os.scandir(path):
-        entries.append(entry.name + ("/" if entry.is_dir() else ""))
-    return "\n".join(sorted(entries)) or "(empty director)"
+from cleankoda.tools.filesystem import JailedFilesystem
+from cleankoda.tools.sandbox import DockerSandbox
+from cleankoda.tools.host_runner import HostRunner
 
-def read_file(path: str) -> str:
-    with open(path, "r", encoding = "utf-8") as f:
-        return f.read()
+# Instanzen für den aktuellen Projektordner
+workspace = Path.cwd()
+fs = JailedFilesystem(workspace_root=workspace)
+sandbox = DockerSandbox(workspace_path=workspace)
+host_runner = HostRunner(workspace_path=workspace)
+use_sandbox = True
 
-def write_file(path: str, content: str) -> str:
-    with open(path, "w", encoding = "utf-8") as f:
-        f.write(content)
-    return f"Write {path} ({len(content)} characters)"
+async def dispatch_bash(command: str, timeout: int = 30) -> str:
+    """
+    Dynamischer Dispatcher für Shell-Befehle:
+    Leitet das Kommando je nach aktuellem Flag an die Docker-Sandbox
+    oder den Host-Runner weiter. Beide Schnittstellen sind asynchron.
+    """
+    runner = sandbox if use_sandbox else host_runner
+    return await runner.execute(command=command, timeout=timeout)
 
-def run_command(command: str) -> str:
-    answer= input(f"Run '{command}'? [y/N] ")
-    if answer.strip().lower() != "y":
-        return "The user declined to run this command."
-    result = subprocess.run(
-        command, shell=True, capture_output=True, text=True, timeout=120
-    )
-    output = (result.stdout + result.stderr).strip()
-    return output or f"no output, exit code {result.returncode}"
+# Das einheitliche, rein asynchrone Tool-Dictionary
+AsyncToolCallable = Callable[..., Coroutine[Any, Any, str]]
 
-TOOLS = {
-    "list_files": list_files,
-    "read_file": read_file,
-    "write_file": write_file,
-    "run_command": run_command,
+# Das zentrale Tool-Registry-Dictionary
+TOOLS: dict[str, Callable[..., Any]] = {
+    # Host-Tools (Path-Jailed, extrem schnell)
+    "read_file": fs.read_file,
+    "write_file": fs.write_file,
+    "list_dir": fs.list_dir,
+    "run_bash": dispatch_bash,
 }
 
 TOOL_SCHEMAS = [
     {
         "type": "function",
         "function":{
-            "name": "list_files",
+            "name": "list_dir",
             "description": "List the files in a directory. Folders end with /.",
             "parameters": {
                 "type": "object",
@@ -81,7 +81,7 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function":{
-            "name": "run_command",
+            "name": "run_bash",
             "description": "Run a shell command and return its output. The user approves it first.",
             "parameters": {
                 "type": "object",
@@ -95,7 +95,7 @@ TOOL_SCHEMAS = [
 ]
 
 
-def run_tool(tool_call: Any) -> str:
+async def run_tool(tool_call: Any) -> str:
     """Führt einen Tool-Call aus und gibt das Ergebnis als String zurück."""
     import json
     func = getattr(tool_call, "function", None)
@@ -122,6 +122,15 @@ def run_tool(tool_call: Any) -> str:
         return f"Error: Tool '{name}' not found."
 
     try:
-        return str(TOOLS[name](**args))
+        result = await TOOLS[name](**args)
+        return result
     except Exception as error:
         return f"Error: {error}"
+
+
+def toggle_sandbox(enabled: bool) -> str:
+    global use_sandbox
+    use_sandbox = enabled
+    if enabled and not sandbox.container:
+        sandbox.start()
+    return f"Sandbox ist nun {'aktiviert' if enabled else 'deaktiviert'}."

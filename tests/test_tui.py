@@ -91,6 +91,10 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         from cleankoda.tui import TUI
 
         mock_app = MagicMock()
+        def _close_coro(coro):
+            if hasattr(coro, "close"):
+                coro.close()
+        mock_app.create_background_task.side_effect = _close_coro
         mock_get_app.return_value = mock_app
 
         memory = Memory(system_prompt="Test")
