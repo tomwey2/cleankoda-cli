@@ -12,7 +12,7 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
-from cleankoda.commands import SLASH_COMMANDS, CommandContext, registry
+from cleankoda.commands import CommandContext, registry
 from cleankoda.llm_service import stream_chat_response
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState
@@ -24,11 +24,13 @@ BANNER = """
 """
 
 TUI_STYLE = Style.from_dict({
-    "completion-menu": "bg:#222222 #ffffff",
-    "completion-menu.completion": "bg:#222222 #ffffff",
-    "completion-menu.completion.current": "bg:#005f87 #ffffff bold",
-    "completion-menu.meta": "bg:#333333 #aaaaaa",
-    "completion-menu.completion.current.meta": "bg:#0087af #ffffff",
+    "completion-menu": "bg:#d0d0d0 #000000",
+    "completion-menu.completion": "bg:#d0d0d0 #000000",
+    "completion-menu.completion.current": "bg:#005f87 #ffffff noreverse bold",
+    "completion-menu.meta": "bg:#d0d0d0 #555555",
+    "completion-menu.meta.completion": "bg:#d0d0d0 #555555",
+    "completion-menu.meta.completion.current": "bg:#005f87 #ffffff noreverse",
+    "completion-menu.completion.current.meta": "bg:#005f87 #ffffff noreverse",
 })
 
 
@@ -36,7 +38,12 @@ class SlashCommandCompleter(Completer):
     """Autocompleter for slash commands in the TUI input line."""
 
     def __init__(self, commands: dict[str, str] | None = None) -> None:
-        self.commands = commands if commands is not None else SLASH_COMMANDS
+        self._commands = commands
+
+    def _get_commands(self) -> dict[str, str]:
+        if self._commands is not None:
+            return self._commands
+        return {f"/{cmd.name}": cmd.description for cmd in registry.list_commands()}
 
     def get_completions(self, document, complete_event):
         text_before_cursor = document.text_before_cursor
@@ -49,8 +56,9 @@ class SlashCommandCompleter(Completer):
         if not word.startswith("/"):
             return
 
+        commands_map = self._get_commands()
         word_lower = word.lower()
-        for cmd, desc in self.commands.items():
+        for cmd, desc in commands_map.items():
             if cmd.lower().startswith(word_lower):
                 yield Completion(
                     text=cmd,

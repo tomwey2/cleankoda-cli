@@ -1,6 +1,7 @@
 import unittest
 from prompt_toolkit.document import Document
-from cleankoda.commands import SLASH_COMMANDS
+from prompt_toolkit.document import Document
+from cleankoda.commands import registry
 from cleankoda.tui import SlashCommandCompleter, TUI_STYLE
 from cleankoda.memory import Memory
 
@@ -8,7 +9,7 @@ from cleankoda.memory import Memory
 class TestSlashCommandCompleter(unittest.TestCase):
 
     def setUp(self):
-        self.completer = SlashCommandCompleter(SLASH_COMMANDS)
+        self.completer = SlashCommandCompleter()
 
     def test_trigger_on_slash(self):
         doc = Document("/", 1)
@@ -28,7 +29,7 @@ class TestSlashCommandCompleter(unittest.TestCase):
         completions = list(self.completer.get_completions(doc, None))
         self.assertEqual(len(completions), 1)
         self.assertEqual(completions[0].text, "/provider")
-        self.assertEqual(completions[0].display_meta_text, "Wechselt den LLM-Provider und konfiguriert API-Keys")
+        self.assertEqual(completions[0].display_meta_text, registry._commands["provider"].description)
         self.assertEqual(completions[0].start_position, -5)
 
     def test_no_completion_without_slash(self):

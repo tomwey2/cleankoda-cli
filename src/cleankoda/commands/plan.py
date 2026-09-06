@@ -3,7 +3,7 @@ from cleankoda.commands.registry import CommandContext, CommandResult, registry
 
 @registry.register(
     "plan",
-    description="Erstellt einen schrittweisen Implementierungsplan",
+    description="Create a step-by-step implementation plan",
     usage="/plan [goal]",
 )
 def cmd_plan(args: list[str], ctx: CommandContext) -> CommandResult:
