@@ -1,3 +1,4 @@
+import asyncio
 import logging
 from typing import TYPE_CHECKING, Any, AsyncGenerator
 
@@ -17,6 +18,25 @@ if TYPE_CHECKING:
 from cleankoda.tools import TOOL_SCHEMAS, run_tool
 
 litellm.suppress_debug_info = True
+
+
+def is_cold_start_error(e: Exception) -> bool:
+    """Prüft, ob ein Fehler auf einen Serverless Cold Start / ein ladendes Modell hindeutet."""
+    if isinstance(e, (ServiceUnavailableError, APIConnectionError, APIError)):
+        msg = str(e).lower()
+        status_code = getattr(e, "status_code", None)
+        if status_code == 503:
+            return True
+        keywords = [
+            "loading model",
+            "model is loading",
+            "service unavailable",
+            "cold start",
+            "503",
+            "starting up",
+        ]
+        return any(kw in msg for kw in keywords)
+    return False
 
 
 def format_tool_call_display(func_name: str, func_args: Any) -> str:
@@ -59,8 +79,13 @@ async def stream_chat_response(
     messages: list[dict[str, Any]] | Any,
     state: "SessionState | Any",
     tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
+    cancel_event: asyncio.Event | None = None,
+    initial_delay: float = 10.0,
+    max_attempts: int = 10,
 ) -> AsyncGenerator[str, None]:
-    """Streamt Antworten von LiteLLM basierend auf dem angegebenen SessionState und führt ggf. Tool-Calls aus."""
+    """Streamt Antworten von LiteLLM basierend auf dem angegebenen SessionState und führt ggf. Tool-Calls aus.
+    Unterstützt automatische Retries bei Cold Starts mit exponentiellem Backoff und Abbruch per cancel_event.
+    """
     litellm.suppress_debug_info = True
 
     from cleankoda.llm.config import get_provider_config
@@ -109,38 +134,67 @@ async def stream_chat_response(
             kwargs["api_key"] = "dummy"
 
         chunks = []
-        try:
-            response = await litellm.acompletion(**kwargs)
-            async for chunk in response:
-                if not chunk:
-                    continue
-                choices = getattr(chunk, "choices", None) or (chunk.get("choices") if isinstance(chunk, dict) else None)
-                if not choices:
-                    continue
-                chunks.append(chunk)
-                first_choice = choices[0]
-                delta = getattr(first_choice, "delta", None) or (first_choice.get("delta") if isinstance(first_choice, dict) else None)
-                if not delta:
-                    continue
-                content = getattr(delta, "content", None) or (delta.get("content") if isinstance(delta, dict) else None)
-                if content:
-                    yield content
+        attempt = 0
+        model_ready_notified = False
 
-        except AuthenticationError as e:
-            yield f"[Authentication Error ({state.provider}): Please check your API key. Details: {e}]"
-            return
-        except RateLimitError as e:
-            yield f"[Rate Limit Exceeded ({state.provider}): {e}]"
-            return
-        except (APIConnectionError, ServiceUnavailableError) as e:
-            yield f"[Connection Error ({state.provider}): Unable to reach server. {e}]"
-            return
-        except APIError as e:
-            yield f"[LLM Error ({state.provider}): {e}]"
-            return
-        except Exception as e:
-            yield f"[Unexpected Error ({state.provider}): {type(e).__name__} - {e}]"
-            return
+        while True:
+            try:
+                response = await litellm.acompletion(**kwargs)
+                async for chunk in response:
+                    if not chunk:
+                        continue
+                    choices = getattr(chunk, "choices", None) or (chunk.get("choices") if isinstance(chunk, dict) else None)
+                    if not choices:
+                        continue
+                    chunks.append(chunk)
+                    first_choice = choices[0]
+                    delta = getattr(first_choice, "delta", None) or (first_choice.get("delta") if isinstance(first_choice, dict) else None)
+                    if not delta:
+                        continue
+                    content = getattr(delta, "content", None) or (delta.get("content") if isinstance(delta, dict) else None)
+                    if content:
+                        if attempt > 0 and not model_ready_notified:
+                            yield "[green]✔ Modell bereit.[/green]\n"
+                            model_ready_notified = True
+                        yield content
+                break
+            except AuthenticationError as e:
+                yield f"[Authentication Error ({state.provider}): Please check your API key. Details: {e}]"
+                return
+            except RateLimitError as e:
+                yield f"[Rate Limit Exceeded ({state.provider}): {e}]"
+                return
+            except (ServiceUnavailableError, APIConnectionError, APIError) as e:
+                if is_cold_start_error(e):
+                    attempt += 1
+                    if attempt > max_attempts:
+                        yield f"[LLM Error ({state.provider}): Serverless LLM konnte nach {max_attempts} Versuchen nicht gestartet werden.]\n"
+                        return
+
+                    current_delay = initial_delay * (2 ** (attempt - 1))
+                    yield (
+                        f"[yellow]⟳ LLM startet (Cold Start)... Versuch {attempt}/{max_attempts}. "
+                        f"Nächster Check in {int(current_delay)}s [Esc zum Abbrechen][/yellow]\n"
+                    )
+
+                    if cancel_event is not None:
+                        try:
+                            await asyncio.wait_for(cancel_event.wait(), timeout=current_delay)
+                            yield "[yellow]Start des LLMs abgebrochen.[/yellow]\n"
+                            return
+                        except asyncio.TimeoutError:
+                            pass
+                    else:
+                        await asyncio.sleep(current_delay)
+                else:
+                    if isinstance(e, (APIConnectionError, ServiceUnavailableError)):
+                        yield f"[Connection Error ({state.provider}): Unable to reach server. {e}]"
+                    else:
+                        yield f"[LLM Error ({state.provider}): {e}]"
+                    return
+            except Exception as e:
+                yield f"[Unexpected Error ({state.provider}): {type(e).__name__} - {e}]"
+                return
 
         if not chunks:
             break

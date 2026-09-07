@@ -119,6 +119,7 @@ class TUI:
         self.memory = memory
         self.showing_shortcuts = False
         self.is_processing = False
+        self.cancel_event = asyncio.Event()
 
         self.history_area = TextArea(
             text=BANNER
@@ -217,6 +218,8 @@ class TUI:
 
         @self.kb.add("escape", eager=True)
         def _handle_escape(event):
+            if self.is_processing:
+                self.cancel_event.set()
             if self.input_field.text.lstrip().startswith("/"):
                 self.input_field.text = ""
             self.showing_shortcuts = False
@@ -280,8 +283,9 @@ class TUI:
 
         self.memory.add_user(user_text)
 
+        self.cancel_event.clear()
         state = SessionState.load()
-        async for chunk in stream_chat_response(self.memory, state):
+        async for chunk in stream_chat_response(self.memory, state, cancel_event=self.cancel_event):
             indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk
             self.history_area.buffer.cursor_position = len(self.history_area.text)
