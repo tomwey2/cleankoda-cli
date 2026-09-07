@@ -44,21 +44,29 @@ class TestSandboxPackage(unittest.TestCase):
         def _make_mock(workspace_path, image):
             mock = MagicMock()
             mock.image = image
+
+            async def _fake_start_async():
+                pass
+
+            mock.start_async = _fake_start_async
             return mock
 
         mock_docker_sandbox.side_effect = _make_mock
 
-        manager = SandboxManager(workspace_path=self.workspace, default_image=None)
-        self.assertIsInstance(manager.current_env, HostSandbox)
-        self.assertEqual(manager.get_status(), "host")
+        async def _test():
+            manager = SandboxManager(workspace_path=self.workspace, default_image=None)
+            self.assertIsInstance(manager.current_env, HostSandbox)
+            self.assertEqual(manager.get_status(), "host")
 
-        status_msg = manager.switch_environment("python:3.11-slim")
-        self.assertIn("Sandbox aktiv", status_msg)
-        self.assertEqual(manager.get_status(), "python:3.11-slim")
+            status_msg = await manager.switch_environment("python:3.11-slim")
+            self.assertIn("Sandbox aktiv", status_msg)
+            self.assertEqual(manager.get_status(), "python:3.11-slim")
 
-        status_msg_off = manager.switch_environment(None)
-        self.assertIn("Sandbox deaktiviert", status_msg_off)
-        self.assertEqual(manager.get_status(), "host")
+            status_msg_off = await manager.switch_environment(None)
+            self.assertIn("Sandbox deaktiviert", status_msg_off)
+            self.assertEqual(manager.get_status(), "host")
+
+        asyncio.run(_test())
 
     def test_bash_command_tool(self):
         manager = SandboxManager(workspace_path=self.workspace, default_image=None)

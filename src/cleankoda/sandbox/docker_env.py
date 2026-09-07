@@ -22,9 +22,10 @@ class DockerSandbox(ExecutionEnvironment):
         self.image = image
         self.client = docker.from_env()
         self.container = None
+        self._ready_event = asyncio.Event()
 
-    def start(self) -> None:
-        """Startet den Workspace-Container im Hintergrund."""
+    def _sync_start(self) -> None:
+        """Startet den Workspace-Container synchron."""
         if self.container is not None:
             return
 
@@ -51,6 +52,20 @@ class DockerSandbox(ExecutionEnvironment):
             )
         except DockerException as exc:
             raise RuntimeError(f"Fehler beim Starten der Docker-Sandbox: {exc}") from exc
+
+    def start(self) -> None:
+        """Startet den Workspace-Container synchron im Hintergrund."""
+        try:
+            self._sync_start()
+        finally:
+            self._ready_event.set()
+
+    async def start_async(self) -> None:
+        """Startet den Container asynchron in einem separaten Thread."""
+        try:
+            await asyncio.to_thread(self._sync_start)
+        finally:
+            self._ready_event.set()
 
     def _sync_exec(self, command: str) -> Dict[str, Any]:
         """Blockierender exec-Call über das Docker Python SDK."""
@@ -85,8 +100,11 @@ class DockerSandbox(ExecutionEnvironment):
 
     async def run(self, command: str, timeout: int = 30) -> Dict[str, Any]:
         """Führt ein Bash-Kommando asynchron mit Timeout in der Docker-Sandbox aus."""
+        if not self._ready_event.is_set():
+            await self._ready_event.wait()
+
         if not self.container:
-            self.start()
+            await self.start_async()
 
         loop = asyncio.get_running_loop()
         try:
@@ -115,3 +133,4 @@ class DockerSandbox(ExecutionEnvironment):
             except Exception:
                 pass
             self.container = None
+        self._ready_event.clear()

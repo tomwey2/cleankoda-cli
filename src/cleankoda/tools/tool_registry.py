@@ -119,23 +119,23 @@ async def run_tool(tool_call: Any) -> str:
         return f"Error: {error}"
 
 
-def switch_runner(use_sandbox_param: bool, image: str | None = None) -> str:
+async def switch_runner(use_sandbox_param: bool, image: str | None = None) -> str:
     """Safely switch environment in sandbox_manager."""
     if use_sandbox_param and image and image != "host":
-        return sandbox_manager.switch_environment(image)
+        return await sandbox_manager.switch_environment(image)
     else:
-        return sandbox_manager.switch_environment("host")
+        return await sandbox_manager.switch_environment("host")
 
 
 def get_sandbox_status() -> str:
-    """Return active image name or 'host' for status line display."""
+    """Return active image name, 'Startet...' or 'host' for status line display."""
     return sandbox_manager.get_status()
 
 
-def toggle_sandbox(enabled: bool) -> str:
+async def toggle_sandbox(enabled: bool) -> str:
     if enabled:
         current_status = get_sandbox_status()
-        image = current_status if current_status != "host" else DEFAULT_IMAGE
-        return switch_runner(True, image)
+        image = current_status if current_status not in ("host", "Startet...") else DEFAULT_IMAGE
+        return await switch_runner(True, image)
     else:
-        return switch_runner(False)
+        return await switch_runner(False)

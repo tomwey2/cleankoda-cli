@@ -98,21 +98,22 @@ async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
     """Slash-Command Handler für /sandbox."""
     if args:
         target = args[0].strip()
-        if target.lower() == "off":
-            msg = sandbox_manager.switch_environment(None)
-            return CommandResult(output=msg)
-        else:
-            msg = sandbox_manager.switch_environment(target)
-            return CommandResult(output=msg)
-
-    # Interaktive Auswahl, falls keine Argumente angegeben sind
-    selected = await select_sandbox_interactive(ctx)
-    if selected is None:
-        return CommandResult(output="Sandbox-Auswahl abgebrochen.")
-
-    if selected == "host":
-        msg = sandbox_manager.switch_environment(None)
     else:
-        msg = sandbox_manager.switch_environment(selected)
+        target = await select_sandbox_interactive(ctx)
+        if target is None:
+            return CommandResult(output="Sandbox-Auswahl abgebrochen.")
+
+    if target.lower() in ("off", "host"):
+        msg = await sandbox_manager.switch_environment(None)
+    else:
+        # Sofort Statuszeile aktualisieren
+        sandbox_manager.is_starting = True
+        if ctx.app:
+            ctx.app.invalidate()
+
+        msg = await sandbox_manager.switch_environment(target)
+
+    if ctx.app:
+        ctx.app.invalidate()
 
     return CommandResult(output=msg)

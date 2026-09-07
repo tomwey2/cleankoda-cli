@@ -1,6 +1,6 @@
 import asyncio
 import unittest
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from prompt_toolkit.application import Application
 from prompt_toolkit.document import Document
@@ -21,7 +21,7 @@ class TestSandboxCommand(unittest.TestCase):
 
     def setUp(self):
         # Reset to host runner before each test
-        switch_runner(use_sandbox_param=False)
+        asyncio.run(switch_runner(use_sandbox_param=False))
 
     def test_sandbox_command_registered(self):
         cmds = registry.list_commands()
@@ -29,8 +29,7 @@ class TestSandboxCommand(unittest.TestCase):
         self.assertIn("sandbox", cmd_names)
 
     def test_sandbox_off_direct(self):
-        # First switch to a mock sandbox
-        switch_runner(use_sandbox_param=False)
+        asyncio.run(switch_runner(use_sandbox_param=False))
         ctx = CommandContext(memory=Memory(system_prompt="Test"))
         res = registry.dispatch("/sandbox off", ctx)
         self.assertIn("Sandbox deaktiviert", res.output)
@@ -40,18 +39,19 @@ class TestSandboxCommand(unittest.TestCase):
     def test_sandbox_image_direct(self, mock_docker_sandbox):
         mock_instance = MagicMock()
         mock_instance.image = "node:20-slim"
+        mock_instance.start_async = AsyncMock()
         mock_docker_sandbox.return_value = mock_instance
 
         ctx = CommandContext(memory=Memory(system_prompt="Test"))
         res = registry.dispatch("/sandbox node:20-slim", ctx)
         self.assertIn("Sandbox aktiv: Image [node:20-slim]", res.output)
         self.assertEqual(get_sandbox_status(), "node:20-slim")
-        mock_instance.start.assert_called_once()
+        mock_instance.start_async.assert_awaited_once()
 
     @patch("cleankoda.sandbox.manager.DockerSandbox")
     def test_sandbox_docker_error_fallback(self, mock_docker_sandbox):
         mock_instance = MagicMock()
-        mock_instance.start.side_effect = RuntimeError("Docker daemon not reachable")
+        mock_instance.start_async = AsyncMock(side_effect=RuntimeError("Docker daemon not reachable"))
         mock_docker_sandbox.return_value = mock_instance
 
         ctx = CommandContext(memory=Memory(system_prompt="Test"))

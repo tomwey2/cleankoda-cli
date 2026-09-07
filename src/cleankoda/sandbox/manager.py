@@ -16,32 +16,40 @@ class SandboxManager:
     ) -> None:
         self.workspace_path = workspace_path.resolve()
         self.current_env: ExecutionEnvironment = HostSandbox(self.workspace_path)
+        self.is_starting: bool = False
         if default_image and default_image != "host":
-            self.switch_environment(default_image)
+            # Bereite DockerSandbox vor (Start erfolgt asynchron via start_async oder run)
+            self.current_env = DockerSandbox(self.workspace_path, image=default_image)
 
-    def switch_environment(self, image: str | None) -> str:
+    async def switch_environment(self, image: str | None) -> str:
         """
-        Stoppt die aktive Umgebung und schaltet auf eine neue Umgebung um.
-        Wenn `image` angegeben ist (und != "host"), wird eine DockerSandbox erstellt.
+        Stoppt die aktive Umgebung und schaltet asynchron auf eine neue Umgebung um.
+        Wenn `image` angegeben ist (und != "host"), wird eine DockerSandbox gestartet.
         Bei `None` oder "host" wird die HostSandbox (Null Object Pattern) verwendet.
         """
         self.current_env.stop()
 
         if image and image != "host":
+            self.is_starting = True
             try:
                 new_env = DockerSandbox(self.workspace_path, image=image)
-                new_env.start()
+                await new_env.start_async()
                 self.current_env = new_env
                 return f"Sandbox aktiv: Image [{image}]"
             except Exception as exc:
                 self.current_env = HostSandbox(self.workspace_path)
                 return f"Fehler beim Starten der Sandbox ({exc}). Fallback auf Host-System."
+            finally:
+                self.is_starting = False
         else:
+            self.is_starting = False
             self.current_env = HostSandbox(self.workspace_path)
             return "Sandbox deaktiviert: Befehle laufen direkt auf dem Host."
 
     def get_status(self) -> str:
-        """Gibt den Namen des aktiven Docker-Images oder 'host' zurück."""
+        """Gibt den Namen des aktiven Docker-Images, 'Startet...' oder 'host' zurück."""
+        if self.is_starting:
+            return "Startet..."
         image = getattr(self.current_env, "image", None)
         return image if image else "host"
 
