@@ -32,7 +32,7 @@ class TestSandboxCommand(unittest.TestCase):
         asyncio.run(switch_runner(use_sandbox_param=False))
         ctx = CommandContext(memory=Memory(system_prompt="Test"))
         res = registry.dispatch("/sandbox off", ctx)
-        self.assertIn("Sandbox deaktiviert", res.output)
+        self.assertIn("Sandbox disabled", res.output)
         self.assertEqual(get_sandbox_status(), "host")
 
     @patch("cleankoda.sandbox.manager.DockerSandbox")
@@ -44,7 +44,7 @@ class TestSandboxCommand(unittest.TestCase):
 
         ctx = CommandContext(memory=Memory(system_prompt="Test"))
         res = registry.dispatch("/sandbox node:20-slim", ctx)
-        self.assertIn("Sandbox aktiv: Image [node:20-slim]", res.output)
+        self.assertIn("Sandbox enabled: Image [node:20-slim]", res.output)
         self.assertEqual(get_sandbox_status(), "node:20-slim")
         mock_instance.start_async.assert_awaited_once()
 
@@ -56,8 +56,8 @@ class TestSandboxCommand(unittest.TestCase):
 
         ctx = CommandContext(memory=Memory(system_prompt="Test"))
         res = registry.dispatch("/sandbox python:3.12-slim", ctx)
-        self.assertIn("Fehler beim Starten der Sandbox", res.output)
-        self.assertIn("Fallback auf Host-System", res.output)
+        self.assertIn("Error starting sandbox", res.output)
+        self.assertIn("Fallback to host system", res.output)
         self.assertEqual(get_sandbox_status(), "host")
 
     def test_sandbox_interactive_selection_in_tui(self):

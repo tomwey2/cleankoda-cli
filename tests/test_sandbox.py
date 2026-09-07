@@ -59,11 +59,11 @@ class TestSandboxPackage(unittest.TestCase):
             self.assertEqual(manager.get_status(), "host")
 
             status_msg = await manager.switch_environment("python:3.11-slim")
-            self.assertIn("Sandbox aktiv", status_msg)
+            self.assertIn("Sandbox enabled", status_msg)
             self.assertEqual(manager.get_status(), "python:3.11-slim")
 
             status_msg_off = await manager.switch_environment(None)
-            self.assertIn("Sandbox deaktiviert", status_msg_off)
+            self.assertIn("Sandbox disabled", status_msg_off)
             self.assertEqual(manager.get_status(), "host")
 
         asyncio.run(_test())
