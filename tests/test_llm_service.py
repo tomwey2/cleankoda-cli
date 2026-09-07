@@ -49,7 +49,8 @@ class TestLLMService(unittest.TestCase):
             messages = [{"role": "user", "content": "Hello"}]
 
             async def mock_acompletion(*args, **kwargs):
-                self.assertNotIn("api_key", kwargs)
+                self.assertEqual(kwargs.get("api_key"), "dummy")
+                self.assertEqual(kwargs.get("api_base"), "http://localhost:11434/v1")
                 self.assertEqual(kwargs.get("model"), "ollama/llama3.3")
                 mock_chunk = MagicMock()
                 mock_chunk.choices = [MagicMock(delta=MagicMock(content="Ollama response"))]

@@ -23,8 +23,16 @@ class SessionState(BaseModel):
     @property
     def litellm_model_identifier(self) -> str:
         """Mappt Provider und Modell auf LiteLLM-kompatible Präfixe."""
+        from cleankoda.llm.config import get_provider_config
+
         provider_lower = self.provider.lower()
         model_str = self.model
+
+        p_config = get_provider_config(provider_lower)
+        if p_config and p_config.is_custom:
+            if model_str.startswith("openai/"):
+                return model_str
+            return f"openai/{model_str}"
 
         if "/" in model_str:
             return model_str
@@ -37,7 +45,7 @@ class SessionState(BaseModel):
         if provider_lower in ["ollama", "openrouter", "anthropic", "openai", "mistral"]:
             return f"{provider_lower}/{model_str}"
 
-        return f"{provider_lower}/{model_str}"
+        return f"openai/{model_str}"
 
     def get_active_api_key(self, credentials_file: Path | None = None) -> str | None:
         """Holt den aktiven API-Key über den CredentialsStore."""

@@ -63,6 +63,11 @@ async def stream_chat_response(
     """Streamt Antworten von LiteLLM basierend auf dem angegebenen SessionState und führt ggf. Tool-Calls aus."""
     litellm.suppress_debug_info = True
 
+    from cleankoda.llm.config import get_provider_config
+
+    provider_name = getattr(state, "provider", "mistral")
+    provider_config = get_provider_config(provider_name)
+
     model_identifier = state.litellm_model_identifier
     api_key = state.get_active_api_key()
 
@@ -92,11 +97,16 @@ async def stream_chat_response(
             "stream": True,
         }
 
+        if provider_config and provider_config.api_base:
+            kwargs["api_base"] = provider_config.api_base
+
         if tools:
             kwargs["tools"] = tools
 
         if api_key:
             kwargs["api_key"] = api_key
+        elif provider_config and (provider_config.api_base or provider_config.is_custom or not provider_config.requires_api_key):
+            kwargs["api_key"] = "dummy"
 
         chunks = []
         try:

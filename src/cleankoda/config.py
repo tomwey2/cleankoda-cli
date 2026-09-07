@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from cleankoda.llm import PROVIDER_MODELS, PROVIDERS
+from cleankoda.llm import get_models_for_provider as fetch_models_for_provider
 from cleankoda.session_state import SessionState
 
 CONFIG_DIR = Path.home() / ".config" / "cleankoda"
@@ -8,17 +8,17 @@ CONFIG_FILE = CONFIG_DIR / "config.json"
 
 
 def load_session_state() -> SessionState:
-    """Lädt den SessionState aus CONFIG_FILE."""
+    """Loads the session state from CONFIG_FILE."""
     return SessionState.load(file_path=CONFIG_FILE)
 
 
 def save_session_state(state: SessionState) -> None:
-    """Speichert den SessionState in CONFIG_FILE."""
+    """Stores the session state in CONFIG_FILE."""
     state.save(file_path=CONFIG_FILE)
 
 
 def get_provider() -> str | None:
-    """Gibt den aktuell konfigurierten Provider zurück."""
+    """Returns the currently configured provider."""
     if not CONFIG_FILE.is_file():
         return None
     state = load_session_state()
@@ -26,8 +26,8 @@ def get_provider() -> str | None:
 
 
 def set_provider(provider_name: str) -> None:
-    """Setzt den Provider in der Konfiguration und speichert diese.
-    Setzt das Modell auf das erste Modell in der Liste des jeweiligen Providers.
+    """Set the provider in the configuration and save it.
+    Set the model to the first model in the list of the respective provider.
     """
     state = load_session_state()
     state.provider = provider_name
@@ -38,10 +38,10 @@ def set_provider(provider_name: str) -> None:
 
 
 def get_models_for_provider(provider_name: str | None = None) -> list[str]:
-    """Gibt die Liste der verfügbaren Modelle für einen Provider zurück."""
+    """Returns the list of available models for a provider."""
     if not provider_name:
         provider_name = get_provider() or "mistral"
-    return PROVIDER_MODELS.get(provider_name.lower(), PROVIDER_MODELS["mistral"])
+    return fetch_models_for_provider(provider_name)
 
 
 def get_model() -> str:
