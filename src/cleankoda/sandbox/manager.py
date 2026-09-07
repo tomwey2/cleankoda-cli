@@ -7,7 +7,7 @@ from cleankoda.sandbox.host_env import HostSandbox
 
 
 class SandboxManager:
-    """Verwaltet den Lifecycle und das Umschalten der Ausführungsumgebung."""
+    """Manages the lifecycle and switching of the execution environment."""
 
     def __init__(
         self,
@@ -18,14 +18,14 @@ class SandboxManager:
         self.current_env: ExecutionEnvironment = HostSandbox(self.workspace_path)
         self.is_starting: bool = False
         if default_image and default_image != "host":
-            # Bereite DockerSandbox vor (Start erfolgt asynchron via start_async oder run)
+            # Prepare DockerSandbox (start asynchronously via start_async or run)
             self.current_env = DockerSandbox(self.workspace_path, image=default_image)
 
     async def switch_environment(self, image: str | None) -> str:
         """
-        Stoppt die aktive Umgebung und schaltet asynchron auf eine neue Umgebung um.
-        Wenn `image` angegeben ist (und != "host"), wird eine DockerSandbox gestartet.
-        Bei `None` oder "host" wird die HostSandbox (Null Object Pattern) verwendet.
+        Stops the active environment and asynchronously switches to a new one.
+        If `image` is specified (and != "host"), a DockerSandbox is started.
+        If `None` or "host" is specified, the HostSandbox (Null Object Pattern) is used.
         """
         self.current_env.stop()
 
@@ -35,24 +35,24 @@ class SandboxManager:
                 new_env = DockerSandbox(self.workspace_path, image=image)
                 await new_env.start_async()
                 self.current_env = new_env
-                return f"Sandbox aktiv: Image [{image}]"
+                return f"Sandbox enabled: Image [{image}]"
             except Exception as exc:
                 self.current_env = HostSandbox(self.workspace_path)
-                return f"Fehler beim Starten der Sandbox ({exc}). Fallback auf Host-System."
+                return f"Error starting sandbox ({exc}). Fallback to host system."
             finally:
                 self.is_starting = False
         else:
             self.is_starting = False
             self.current_env = HostSandbox(self.workspace_path)
-            return "Sandbox deaktiviert: Befehle laufen direkt auf dem Host."
+            return "Sandbox disabled: Commands run directly on the host."
 
     def get_status(self) -> str:
-        """Gibt den Namen des aktiven Docker-Images, 'Startet...' oder 'host' zurück."""
+        """Returns the name of the active Docker image, 'Starting...' or 'host'."""
         if self.is_starting:
-            return "Startet..."
+            return "Starting..."
         image = getattr(self.current_env, "image", None)
         return image if image else "host"
 
     def stop(self) -> None:
-        """Fährt die aktive Ausführungsumgebung sauber herunter."""
+        """Cleanly shuts down the active execution environment."""
         self.current_env.stop()
