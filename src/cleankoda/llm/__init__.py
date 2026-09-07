@@ -1,3 +1,7 @@
+from cleankoda.llm.config import (
+    PROVIDER_MODELS,
+    PROVIDERS,
+)
 from cleankoda.llm.credentials import (
     DEFAULT_CREDENTIALS_DIR,
     DEFAULT_CREDENTIALS_FILE,
@@ -9,6 +13,8 @@ from cleankoda.llm.service import (
 )
 
 __all__ = [
+    "PROVIDERS",
+    "PROVIDER_MODELS",
     "CredentialsStore",
     "DEFAULT_CREDENTIALS_DIR",
     "DEFAULT_CREDENTIALS_FILE",

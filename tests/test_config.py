@@ -5,7 +5,6 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cleankoda.config import (
-    PROVIDER_MODELS,
     get_model,
     get_models_for_provider,
     get_provider,
@@ -14,10 +13,19 @@ from cleankoda.config import (
     set_model,
     set_provider,
 )
+from cleankoda.llm.config import PROVIDER_MODELS, PROVIDERS
 from cleankoda.session_state import SessionState
 
 
 class TestConfig(unittest.TestCase):
+
+    def test_llm_config_providers(self):
+        self.assertIn("mistral", PROVIDERS)
+        self.assertIn("openai", PROVIDERS)
+        self.assertIn("anthropic", PROVIDERS)
+        self.assertIn("ollama", PROVIDERS)
+        self.assertIn("google", PROVIDERS)
+        self.assertIn("mistral", PROVIDER_MODELS)
 
     def test_load_session_state_non_existent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
