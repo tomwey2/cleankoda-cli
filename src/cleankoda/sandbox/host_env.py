@@ -7,7 +7,7 @@ from cleankoda.sandbox.base import ExecutionEnvironment
 
 
 class HostSandbox(ExecutionEnvironment):
-    """Null-Object Implementierung: Führt Befehle direkt auf dem Host-System im Workspace aus."""
+    """Null-Object Implementation: Executes commands directly on the host system in the workspace."""
 
     def __init__(
         self,
@@ -17,7 +17,7 @@ class HostSandbox(ExecutionEnvironment):
         super().__init__(workspace_path, max_output_chars)
 
     async def run(self, command: str, timeout: int = 30) -> Dict[str, Any]:
-        """Führt ein Kommando asynchron als Subprozess auf dem Host aus."""
+        """Executes a command asynchronously as a subprocess on the host."""
         try:
             process = await asyncio.create_subprocess_shell(
                 command,
@@ -38,7 +38,7 @@ class HostSandbox(ExecutionEnvironment):
             return {
                 "success": exit_code == 0,
                 "exit_code": exit_code,
-                "output": output_text or "(Keine Ausgabe)",
+                "output": output_text or "(No output)",
             }
 
         except asyncio.TimeoutError:
@@ -49,11 +49,11 @@ class HostSandbox(ExecutionEnvironment):
             return {
                 "success": False,
                 "exit_code": 124,
-                "output": f"Kommando-Timeout nach {timeout} Sekunden erreicht.",
+                "output": f"Command timeout reached after {timeout} seconds.",
             }
         except Exception as exc:
             return {
                 "success": False,
                 "exit_code": -1,
-                "output": f"Host-Ausführungsfehler: {str(exc)}",
+                "output": f"Host execution error: {str(exc)}",
             }

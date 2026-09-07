@@ -10,7 +10,7 @@ from cleankoda.sandbox.base import ExecutionEnvironment
 
 
 class DockerSandbox(ExecutionEnvironment):
-    """Isolierte Docker-Ausführungsumgebung für Shell-Befehle."""
+    """Isolated Docker execution environment for shell commands."""
 
     def __init__(
         self,
@@ -25,7 +25,7 @@ class DockerSandbox(ExecutionEnvironment):
         self._ready_event = asyncio.Event()
 
     def _sync_start(self) -> None:
-        """Startet den Workspace-Container synchron."""
+        """Starts the workspace container synchronously."""
         if self.container is not None:
             return
 
@@ -51,29 +51,29 @@ class DockerSandbox(ExecutionEnvironment):
                 remove=True,  # Container wird beim Stoppen automatisch gelöscht
             )
         except DockerException as exc:
-            raise RuntimeError(f"Fehler beim Starten der Docker-Sandbox: {exc}") from exc
+            raise RuntimeError(f"Error starting Docker sandbox: {exc}") from exc
 
     def start(self) -> None:
-        """Startet den Workspace-Container synchron im Hintergrund."""
+        """Starts the workspace container synchronously in the background."""
         try:
             self._sync_start()
         finally:
             self._ready_event.set()
 
     async def start_async(self) -> None:
-        """Startet den Container asynchron in einem separaten Thread."""
+        """Starts the container asynchronously in a separate thread."""
         try:
             await asyncio.to_thread(self._sync_start)
         finally:
             self._ready_event.set()
 
     def _sync_exec(self, command: str) -> Dict[str, Any]:
-        """Blockierender exec-Call über das Docker Python SDK."""
+        """Blocking exec call via the Docker Python SDK."""
         if not self.container:
             return {
                 "success": False,
                 "exit_code": -1,
-                "output": "Error: Sandbox-Container läuft nicht.",
+                "output": "Error: The sandbox container is not running.",
             }
 
         wrapped_cmd = f"bash -c 'set -o pipefail; {command}'"
@@ -95,11 +95,11 @@ class DockerSandbox(ExecutionEnvironment):
         return {
             "success": exit_code == 0,
             "exit_code": exit_code,
-            "output": output_text or "(Keine Ausgabe)",
+            "output": output_text or "(No output)",
         }
 
     async def run(self, command: str, timeout: int = 30) -> Dict[str, Any]:
-        """Führt ein Bash-Kommando asynchron mit Timeout in der Docker-Sandbox aus."""
+        """Executes a Bash command asynchronously with a timeout in the Docker sandbox."""
         if not self._ready_event.is_set():
             await self._ready_event.wait()
 
@@ -116,17 +116,17 @@ class DockerSandbox(ExecutionEnvironment):
             return {
                 "success": False,
                 "exit_code": 124,
-                "output": f"Kommando-Timeout nach {timeout} Sekunden erreicht.",
+                "output": f"Command timeout reached after {timeout} seconds.",
             }
         except Exception as exc:
             return {
                 "success": False,
                 "exit_code": -1,
-                "output": f"Ausführungsfehler: {str(exc)}",
+                "output": f"Execution error: {str(exc)}",
             }
 
     def stop(self) -> None:
-        """Beendet und entfernt den Container sauber."""
+        """Finish and remove the container cleanly."""
         if self.container:
             try:
                 self.container.kill()
