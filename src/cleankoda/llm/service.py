@@ -1,6 +1,6 @@
 import asyncio
 import logging
-from typing import TYPE_CHECKING, Any, AsyncGenerator
+from typing import TYPE_CHECKING, Any, AsyncGenerator, Callable
 
 import litellm
 from litellm import stream_chunk_builder
@@ -80,11 +80,12 @@ async def stream_chat_response(
     state: "SessionState | Any",
     tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
     cancel_event: asyncio.Event | None = None,
+    status_callback: Callable[[str | None], None] | None = None,
     initial_delay: float = 10.0,
     max_attempts: int = 10,
 ) -> AsyncGenerator[str, None]:
     """Streamt Antworten von LiteLLM basierend auf dem angegebenen SessionState und führt ggf. Tool-Calls aus.
-    Unterstützt automatische Retries bei Cold Starts mit exponentiellem Backoff und Abbruch per cancel_event.
+    Unterstützt automatische Retries bei Cold Starts mit exponentiellem Backoff, Status-Callbacks und Abbruch per cancel_event.
     """
     litellm.suppress_debug_info = True
 
@@ -154,45 +155,68 @@ async def stream_chat_response(
                     content = getattr(delta, "content", None) or (delta.get("content") if isinstance(delta, dict) else None)
                     if content:
                         if attempt > 0 and not model_ready_notified:
-                            yield "[green]✔ Modell bereit.[/green]\n"
+                            if status_callback:
+                                status_callback("✔ Model ready.")
+                            else:
+                                yield "[green]✔ Model ready.[/green]\n"
                             model_ready_notified = True
                         yield content
+                if status_callback and model_ready_notified:
+                    status_callback(None)
                 break
             except AuthenticationError as e:
+                if status_callback:
+                    status_callback(None)
                 yield f"[Authentication Error ({state.provider}): Please check your API key. Details: {e}]"
                 return
             except RateLimitError as e:
+                if status_callback:
+                    status_callback(None)
                 yield f"[Rate Limit Exceeded ({state.provider}): {e}]"
                 return
             except (ServiceUnavailableError, APIConnectionError, APIError) as e:
                 if is_cold_start_error(e):
                     attempt += 1
                     if attempt > max_attempts:
-                        yield f"[LLM Error ({state.provider}): Serverless LLM konnte nach {max_attempts} Versuchen nicht gestartet werden.]\n"
+                        err_msg = f"LLM could not be started after {max_attempts} attempts."
+                        if status_callback:
+                            status_callback(None)
+                        yield f"[LLM Error ({state.provider}): {err_msg}]\n"
                         return
 
                     current_delay = initial_delay * (2 ** (attempt - 1))
-                    yield (
-                        f"[yellow]⟳ LLM startet (Cold Start)... Versuch {attempt}/{max_attempts}. "
-                        f"Nächster Check in {int(current_delay)}s [Esc zum Abbrechen][/yellow]\n"
+                    status_text = (
+                        f"⟳ LLM starts (Cold Start)... Attempt {attempt}/{max_attempts}. "
+                        f"Next in {int(current_delay)}s [Esc to cancel]"
                     )
+
+                    if status_callback:
+                        status_callback(status_text)
+                    else:
+                        yield f"[yellow]{status_text}[/yellow]\n"
 
                     if cancel_event is not None:
                         try:
                             await asyncio.wait_for(cancel_event.wait(), timeout=current_delay)
-                            yield "[yellow]Start des LLMs abgebrochen.[/yellow]\n"
+                            if status_callback:
+                                status_callback(None)
+                            yield "[yellow]LLM startup aborted.[/yellow]\n"
                             return
                         except asyncio.TimeoutError:
                             pass
                     else:
                         await asyncio.sleep(current_delay)
                 else:
+                    if status_callback:
+                        status_callback(None)
                     if isinstance(e, (APIConnectionError, ServiceUnavailableError)):
                         yield f"[Connection Error ({state.provider}): Unable to reach server. {e}]"
                     else:
                         yield f"[LLM Error ({state.provider}): {e}]"
                     return
             except Exception as e:
+                if status_callback:
+                    status_callback(None)
                 yield f"[Unexpected Error ({state.provider}): {type(e).__name__} - {e}]"
                 return
 

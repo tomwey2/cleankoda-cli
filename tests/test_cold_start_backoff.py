@@ -162,6 +162,65 @@ class TestColdStartBackoff(unittest.TestCase):
 
         asyncio.run(_test())
 
+    def test_status_callback_cold_start(self):
+        async def _test():
+            state = SessionState(provider="custom", model="qwen")
+            messages = [{"role": "user", "content": "Hello"}]
+            statuses_received = []
+
+            def status_cb(st):
+                statuses_received.append(st)
+
+            call_count = 0
+
+            async def mock_acompletion(*args, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                if call_count == 1:
+                    raise ServiceUnavailableError(
+                        message="503 Service Unavailable: Loading model",
+                        response=MagicMock(status_code=503),
+                        llm_provider="custom",
+                        model="qwen",
+                    )
+                mock_chunk = {
+                    "id": "chatcmpl-test",
+                    "object": "chat.completion.chunk",
+                    "created": 12345,
+                    "model": "qwen",
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"role": "assistant", "content": "Ready content"},
+                        "finish_reason": "stop"
+                    }]
+                }
+                yield mock_chunk
+
+            async def mock_wait_for(fut, timeout):
+                raise asyncio.TimeoutError()
+
+            cancel_event = asyncio.Event()
+            with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
+                "asyncio.wait_for", side_effect=mock_wait_for
+            ):
+                chunks = []
+                async for token in stream_chat_response(
+                    messages,
+                    state,
+                    cancel_event=cancel_event,
+                    status_callback=status_cb,
+                    initial_delay=10.0,
+                    max_attempts=10,
+                ):
+                    chunks.append(token)
+
+                output = "".join(chunks)
+                self.assertEqual(output, "Ready content")
+                self.assertTrue(any("Versuch 1/10" in s for s in statuses_received if s))
+                self.assertIn("✔ Modell bereit.", statuses_received)
+
+        asyncio.run(_test())
+
 
 if __name__ == "__main__":
     unittest.main()

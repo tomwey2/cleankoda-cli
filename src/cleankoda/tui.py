@@ -178,7 +178,7 @@ class TUI:
             layout=self.layout,
             key_bindings=self.kb,
             full_screen=True,
-            mouse_support=True,
+            mouse_support=False,
             style=TUI_STYLE,
         )
         self.app.float_container = self.float_container
@@ -188,7 +188,7 @@ class TUI:
         sb_status = get_sandbox_status()
         return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature} | Sandbox: {sb_status}"
 
-    def update_status_line(self) -> None:
+    def update_status_line(self, custom_status: str | None = None) -> None:
         session_text = self.get_session_status_text()
         if self.showing_shortcuts:
             self.status_line.window.height = 5
@@ -199,6 +199,9 @@ class TUI:
                 "• Ctrl+C  : Exit application\n"
                 "• Ctrl+Q  : Exit application"
             )
+        elif custom_status:
+            self.status_line.window.height = 2
+            self.status_line.text = f"{session_text}\n{custom_status}"
         else:
             self.status_line.window.height = 2
             self.status_line.text = f"{session_text}\nCtrl+O for shortcuts"
@@ -259,6 +262,7 @@ class TUI:
             self.history_area.buffer.cursor_position = len(self.history_area.text)
         finally:
             self.is_processing = False
+            self.update_status_line(None)
             if not self.showing_shortcuts:
                 self.input_field.read_only = False
             self.app.invalidate()
@@ -284,8 +288,15 @@ class TUI:
         self.memory.add_user(user_text)
 
         self.cancel_event.clear()
+
+        def status_cb(status_text: str | None) -> None:
+            self.update_status_line(status_text)
+            self.app.invalidate()
+
         state = SessionState.load()
-        async for chunk in stream_chat_response(self.memory, state, cancel_event=self.cancel_event):
+        async for chunk in stream_chat_response(
+            self.memory, state, cancel_event=self.cancel_event, status_callback=status_cb
+        ):
             indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk
             self.history_area.buffer.cursor_position = len(self.history_area.text)
