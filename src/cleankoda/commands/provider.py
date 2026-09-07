@@ -8,7 +8,7 @@ from prompt_toolkit.widgets import Button, Dialog, RadioList, TextArea
 
 from cleankoda.commands.registry import CommandContext, CommandResult, registry
 from cleankoda.config import PROVIDERS, get_provider, set_provider
-from cleankoda.credentials import CredentialsStore
+from cleankoda.llm import CredentialsStore
 
 
 async def _show_tui_modal_provider_dialog(

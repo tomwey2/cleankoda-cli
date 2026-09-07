@@ -1,17 +1,19 @@
 import logging
-from typing import AsyncGenerator, Any
+from typing import TYPE_CHECKING, Any, AsyncGenerator
 
 import litellm
 from litellm import stream_chunk_builder
 from litellm.exceptions import (
+    APIConnectionError,
     APIError,
     AuthenticationError,
-    APIConnectionError,
     RateLimitError,
     ServiceUnavailableError,
 )
 
-from cleankoda.session_state import SessionState
+if TYPE_CHECKING:
+    from cleankoda.session_state import SessionState
+
 from cleankoda.tools import TOOL_SCHEMAS, run_tool
 
 litellm.suppress_debug_info = True
@@ -55,7 +57,7 @@ def format_tool_call_display(func_name: str, func_args: Any) -> str:
 
 async def stream_chat_response(
     messages: list[dict[str, Any]] | Any,
-    state: SessionState,
+    state: "SessionState | Any",
     tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
 ) -> AsyncGenerator[str, None]:
     """Streamt Antworten von LiteLLM basierend auf dem angegebenen SessionState und führt ggf. Tool-Calls aus."""

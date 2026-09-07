@@ -13,7 +13,7 @@ from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
 from cleankoda.commands import CommandContext, registry
-from cleankoda.llm_service import stream_chat_response
+from cleankoda.llm import stream_chat_response
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState
 from cleankoda.tools import get_sandbox_status, sandbox_manager

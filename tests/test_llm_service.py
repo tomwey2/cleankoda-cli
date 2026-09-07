@@ -1,15 +1,15 @@
 import asyncio
 import unittest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import litellm
 from litellm.exceptions import (
+    APIConnectionError,
     AuthenticationError,
     RateLimitError,
-    APIConnectionError,
 )
 
-from cleankoda.llm_service import stream_chat_response
+from cleankoda.llm import stream_chat_response
 from cleankoda.session_state import SessionState
 
 
@@ -142,7 +142,7 @@ class TestLLMService(unittest.TestCase):
                     yield chunk_text_2
 
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
-                "cleankoda.llm_service.run_tool", return_value="file1.txt\nfile2.txt"
+                "cleankoda.llm.service.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
                 async for token in stream_chat_response(mem, state):

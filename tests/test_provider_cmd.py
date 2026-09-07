@@ -10,7 +10,7 @@ from prompt_toolkit.layout.layout import Layout
 
 from cleankoda.commands import CommandContext, registry
 from cleankoda.config import get_provider
-from cleankoda.credentials import CredentialsStore
+from cleankoda.llm import CredentialsStore
 from cleankoda.memory import Memory
 
 
@@ -49,7 +49,7 @@ class TestProviderCommand(unittest.TestCase):
 
             with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
                 "cleankoda.config.CONFIG_FILE", config_file
-            ), patch("cleankoda.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
+            ), patch("cleankoda.llm.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider openai", ctx)
                 self.assertIn("API key updated. Provider switched to: openai", res.output)
                 self.assertEqual(get_provider(), "openai")
@@ -85,7 +85,7 @@ class TestProviderCommand(unittest.TestCase):
 
             with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
                 "cleankoda.config.CONFIG_FILE", config_file
-            ), patch("cleankoda.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
+            ), patch("cleankoda.llm.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider", ctx)
                 self.assertIn("API key updated. Provider switched to: anthropic", res.output)
                 self.assertEqual(get_provider(), "anthropic")
