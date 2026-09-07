@@ -9,27 +9,28 @@ from cleankoda.config import (
     get_model,
     get_models_for_provider,
     get_provider,
-    load_config,
-    save_config,
+    load_session_state,
+    save_session_state,
     set_model,
     set_provider,
 )
+from cleankoda.session_state import SessionState
 
 
 class TestConfig(unittest.TestCase):
 
-    def test_load_config_non_existent(self):
+    def test_load_session_state_non_existent(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
             with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
                 "cleankoda.config.CONFIG_FILE", config_file
             ):
-                config = load_config()
-                self.assertEqual(config, {})
+                state = load_session_state()
+                self.assertEqual(state.provider, "mistral")
                 self.assertIsNone(get_provider())
 
-    def test_save_and_load_config(self):
+    def test_save_and_load_session_state(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             config_dir = Path(tmpdir) / "cleankoda"
             config_file = config_dir / "config.json"
@@ -37,14 +38,15 @@ class TestConfig(unittest.TestCase):
                 "cleankoda.config.CONFIG_FILE", config_file
             ):
                 self.assertFalse(config_dir.exists())
-                save_config({"provider": "openai", "custom": "value"})
+                state = SessionState(provider="openai", model="gpt-4o")
+                save_session_state(state)
 
                 self.assertTrue(config_dir.exists())
                 self.assertTrue(config_file.exists())
 
-                data = load_config()
-                self.assertEqual(data.get("provider"), "openai")
-                self.assertEqual(data.get("custom"), "value")
+                loaded_state = load_session_state()
+                self.assertEqual(loaded_state.provider, "openai")
+                self.assertEqual(loaded_state.model, "gpt-4o")
                 self.assertEqual(get_provider(), "openai")
 
     def test_set_provider(self):

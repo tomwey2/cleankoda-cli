@@ -1,6 +1,4 @@
-import json
 from pathlib import Path
-from typing import Any
 
 from cleankoda.session_state import SessionState
 
@@ -52,28 +50,12 @@ def save_session_state(state: SessionState) -> None:
     state.save(file_path=CONFIG_FILE)
 
 
-def load_config() -> dict[str, Any]:
-    """Lädt die Konfiguration aus CONFIG_FILE."""
-    if not CONFIG_FILE.is_file():
-        return {}
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    except (json.JSONDecodeError, OSError):
-        return {}
-
-
-def save_config(config_data: dict[str, Any]) -> None:
-    """Speichert ein Dict in CONFIG_FILE."""
-    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
-    with open(CONFIG_FILE, "w", encoding="utf-8") as f:
-        json.dump(config_data, f, indent=2)
-
-
 def get_provider() -> str | None:
     """Gibt den aktuell konfigurierten Provider zurück."""
-    config = load_config()
-    return config.get("provider")
+    if not CONFIG_FILE.is_file():
+        return None
+    state = load_session_state()
+    return state.provider
 
 
 def set_provider(provider_name: str) -> None:
