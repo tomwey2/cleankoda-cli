@@ -5,8 +5,8 @@ from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.widgets import Button, Dialog, RadioList
 
 from cleankoda.commands.registry import CommandContext, CommandResult, registry
-from cleankoda.tools.sandbox_images import SANDBOX_IMAGES
-from cleankoda.tools.tool_registry import get_sandbox_status, switch_runner
+from cleankoda.sandbox import AVAILABLE_IMAGES
+from cleankoda.tools.tool_registry import sandbox_manager
 
 
 async def _show_tui_modal_sandbox_dialog(
@@ -17,11 +17,11 @@ async def _show_tui_modal_sandbox_dialog(
     loop = asyncio.get_running_loop()
     fut = loop.create_future()
 
-    values = [(img.id, f"{img.id} - {img.description}") for img in SANDBOX_IMAGES]
+    values = [(img.id, f"{img.id} - {img.description}") for img in AVAILABLE_IMAGES]
     default_val = (
         current_status
-        if any(img.id == current_status for img in SANDBOX_IMAGES)
-        else SANDBOX_IMAGES[0].id
+        if any(img.id == current_status for img in AVAILABLE_IMAGES)
+        else AVAILABLE_IMAGES[0].id
     )
     radio_list = RadioList(values=values, default=default_val)
 
@@ -83,7 +83,7 @@ async def select_sandbox_interactive(
     float_container = getattr(app, "float_container", None) if app else None
 
     if app and float_container:
-        status = current_status or get_sandbox_status()
+        status = current_status or sandbox_manager.get_status()
         return await _show_tui_modal_sandbox_dialog(app, float_container, status)
 
     return None
@@ -99,10 +99,10 @@ async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
     if args:
         target = args[0].strip()
         if target.lower() == "off":
-            msg = switch_runner(use_sandbox_param=False)
+            msg = sandbox_manager.switch_environment(None)
             return CommandResult(output=msg)
         else:
-            msg = switch_runner(use_sandbox_param=True, image=target)
+            msg = sandbox_manager.switch_environment(target)
             return CommandResult(output=msg)
 
     # Interaktive Auswahl, falls keine Argumente angegeben sind
@@ -111,8 +111,8 @@ async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
         return CommandResult(output="Sandbox-Auswahl abgebrochen.")
 
     if selected == "host":
-        msg = switch_runner(use_sandbox_param=False)
+        msg = sandbox_manager.switch_environment(None)
     else:
-        msg = switch_runner(use_sandbox_param=True, image=selected)
+        msg = sandbox_manager.switch_environment(selected)
 
     return CommandResult(output=msg)

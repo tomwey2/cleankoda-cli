@@ -4,6 +4,7 @@ import sys
 from cleankoda.agent import SYSTEM_PROMPT, run_agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.memory import Memory
+from cleankoda.tools import sandbox_manager
 from cleankoda.tui import run_tui
 
 
@@ -12,23 +13,26 @@ def run_headless(prompt_text: str, memory: Memory) -> int:
 
     Returns exit code 0 on success, or 1 on failure.
     """
-    # Slash-Command Check
-    if prompt_text.startswith("/"):
-        ctx = CommandContext(memory=memory)
-        result = registry.dispatch(prompt_text, ctx)
-        if result.output:
-            print(result.output)
-        return 0
-
-    memory.add_user(prompt_text)
     try:
-        response = run_agent(memory)
-        if response:
-            print(response)
-        return 0
-    except Exception as e:
-        print(f"Error running agent: {e}", file=sys.stderr)
-        return 1
+        # Slash-Command Check
+        if prompt_text.startswith("/"):
+            ctx = CommandContext(memory=memory)
+            result = registry.dispatch(prompt_text, ctx)
+            if result.output:
+                print(result.output)
+            return 0
+
+        memory.add_user(prompt_text)
+        try:
+            response = run_agent(memory)
+            if response:
+                print(response)
+            return 0
+        except Exception as e:
+            print(f"Error running agent: {e}", file=sys.stderr)
+            return 1
+    finally:
+        sandbox_manager.stop()
 
 
 def main(argv: list[str] | None = None) -> None:

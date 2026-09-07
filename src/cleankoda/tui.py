@@ -16,7 +16,7 @@ from cleankoda.commands import CommandContext, registry
 from cleankoda.llm_service import stream_chat_response
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState
-from cleankoda.tools import get_sandbox_status
+from cleankoda.tools import get_sandbox_status, sandbox_manager
 
 BANNER = """
   ▄▄▄ █  ▄▄▄   ▄▄▄  ▄▄▄▄  █  ▄  ▄▄▄  ▄▄▄█  ▄▄▄
@@ -289,7 +289,10 @@ class TUI:
 
     def run(self) -> None:
         self.update_status_line()
-        asyncio.run(self.app.run_async())
+        try:
+            asyncio.run(self.app.run_async())
+        finally:
+            sandbox_manager.stop()
 
 
 def run_tui(memory: Memory) -> None:

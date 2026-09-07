@@ -9,7 +9,7 @@ from prompt_toolkit.layout.layout import Layout
 
 from cleankoda.commands import CommandContext, registry
 from cleankoda.memory import Memory
-from cleankoda.tools.sandbox_images import SANDBOX_IMAGES
+from cleankoda.sandbox import AVAILABLE_IMAGES
 from cleankoda.tools.tool_registry import (
     get_sandbox_status,
     switch_runner,
@@ -36,9 +36,10 @@ class TestSandboxCommand(unittest.TestCase):
         self.assertIn("Sandbox deaktiviert", res.output)
         self.assertEqual(get_sandbox_status(), "host")
 
-    @patch("cleankoda.tools.tool_registry.DockerSandbox")
+    @patch("cleankoda.sandbox.manager.DockerSandbox")
     def test_sandbox_image_direct(self, mock_docker_sandbox):
         mock_instance = MagicMock()
+        mock_instance.image = "node:20-slim"
         mock_docker_sandbox.return_value = mock_instance
 
         ctx = CommandContext(memory=Memory(system_prompt="Test"))
@@ -47,7 +48,7 @@ class TestSandboxCommand(unittest.TestCase):
         self.assertEqual(get_sandbox_status(), "node:20-slim")
         mock_instance.start.assert_called_once()
 
-    @patch("cleankoda.tools.tool_registry.DockerSandbox")
+    @patch("cleankoda.sandbox.manager.DockerSandbox")
     def test_sandbox_docker_error_fallback(self, mock_docker_sandbox):
         mock_instance = MagicMock()
         mock_instance.start.side_effect = RuntimeError("Docker daemon not reachable")
@@ -80,7 +81,7 @@ class TestSandboxCommand(unittest.TestCase):
             dialog_kb.bindings[1].handler(None)
 
             res = await task
-            self.assertEqual(res, SANDBOX_IMAGES[0].id)
+            self.assertEqual(res, AVAILABLE_IMAGES[0].id)
             self.assertEqual(len(float_container.floats), 0)
 
         asyncio.run(_test())
