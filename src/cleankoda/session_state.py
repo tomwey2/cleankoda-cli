@@ -1,3 +1,5 @@
+from collections.abc import Callable
+from dataclasses import dataclass, field
 import json
 import os
 from pathlib import Path
@@ -12,6 +14,34 @@ load_dotenv()
 
 DEFAULT_CONFIG_DIR = Path.home() / ".config" / "cleankoda"
 DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.json"
+
+
+@dataclass
+class StatusManager:
+    _slots: dict[str, str] = field(default_factory=dict)
+    on_change: Callable[[], None] | None = None
+
+    def set(self, source: str, message: str) -> None:
+        """Sets or updates the status of a source and notifies observers."""
+        if self._slots.get(source) != message:
+            self._slots[source] = message
+            self._notify()
+
+    def clear(self, source: str) -> None:
+        """Removes the status of a source."""
+        if source in self._slots:
+            del self._slots[source]
+            self._notify()
+
+    def get_combined_status(self) -> str:
+        """Returns active status messages in a formatted, separated by ' | '."""
+        if not self._slots:
+            return ""
+        return " | ".join(self._slots.values())
+
+    def _notify(self) -> None:
+        if self.on_change:
+            self.on_change()
 
 
 class SessionState(BaseModel):

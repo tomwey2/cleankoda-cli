@@ -15,8 +15,9 @@ from prompt_toolkit.widgets import Frame, TextArea
 from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import stream_chat_response
 from cleankoda.memory import Memory
-from cleankoda.session_state import SessionState
+from cleankoda.session_state import SessionState, StatusManager
 from cleankoda.tools import get_sandbox_status, sandbox_manager
+
 
 BANNER = """
   ▄▄▄ █  ▄▄▄   ▄▄▄  ▄▄▄▄  █  ▄  ▄▄▄  ▄▄▄█  ▄▄▄
@@ -115,8 +116,10 @@ class ChatLexer(Lexer):
 class TUI:
     """Terminal User Interface application for cleankoda cli."""
 
-    def __init__(self, memory: Memory) -> None:
+    def __init__(self, memory: Memory, status_manager: StatusManager | None = None) -> None:
         self.memory = memory
+        self.status_manager = status_manager or StatusManager()
+        self.status_manager.on_change = self._on_status_changed
         self.showing_shortcuts = False
         self.is_processing = False
         self.cancel_event = asyncio.Event()
@@ -183,12 +186,20 @@ class TUI:
         )
         self.app.float_container = self.float_container
 
+    def _on_status_changed(self) -> None:
+        self.update_status_line()
+        try:
+            if hasattr(self, "app") and self.app:
+                self.app.invalidate()
+        except Exception:
+            pass
+
     def get_session_status_text(self) -> str:
         state = SessionState.load()
         sb_status = get_sandbox_status()
         return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature} | Sandbox: {sb_status}"
 
-    def update_status_line(self, custom_status: str | None = None) -> None:
+    def update_status_line(self) -> None:
         session_text = self.get_session_status_text()
         if self.showing_shortcuts:
             self.status_line.window.height = 5
@@ -199,12 +210,13 @@ class TUI:
                 "• Ctrl+C  : Exit application\n"
                 "• Ctrl+Q  : Exit application"
             )
-        elif custom_status:
-            self.status_line.window.height = 2
-            self.status_line.text = f"{session_text}\n{custom_status}"
         else:
+            active_status = self.status_manager.get_combined_status()
             self.status_line.window.height = 2
-            self.status_line.text = f"{session_text}\nCtrl+O for shortcuts"
+            if active_status:
+                self.status_line.text = f"{session_text}\n▶ {active_status}"
+            else:
+                self.status_line.text = f"{session_text}\nCtrl+O for shortcuts"
 
     def _register_keybindings(self) -> None:
         @self.kb.add("c-c")
@@ -262,7 +274,7 @@ class TUI:
             self.history_area.buffer.cursor_position = len(self.history_area.text)
         finally:
             self.is_processing = False
-            self.update_status_line(None)
+            self.update_status_line()
             if not self.showing_shortcuts:
                 self.input_field.read_only = False
             self.app.invalidate()
@@ -289,13 +301,9 @@ class TUI:
 
         self.cancel_event.clear()
 
-        def status_cb(status_text: str | None) -> None:
-            self.update_status_line(status_text)
-            self.app.invalidate()
-
         state = SessionState.load()
         async for chunk in stream_chat_response(
-            self.memory, state, cancel_event=self.cancel_event, status_callback=status_cb
+            self.memory, state, cancel_event=self.cancel_event, status_manager=self.status_manager
         ):
             indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk
@@ -310,7 +318,7 @@ class TUI:
             sandbox_manager.stop()
 
 
-def run_tui(memory: Memory) -> None:
+def run_tui(memory: Memory, status_manager: StatusManager | None = None) -> None:
     """Start the interactive TUI application with the provided Memory instance."""
-    tui = TUI(memory)
+    tui = TUI(memory, status_manager=status_manager)
     tui.run()

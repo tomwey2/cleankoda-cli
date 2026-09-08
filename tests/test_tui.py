@@ -117,5 +117,38 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         self.assertIsNone(tui.input_field.buffer.complete_state)
 
 
+class TestTUIStatusManager(unittest.TestCase):
+
+    def test_status_manager_updates_status_line(self):
+        from unittest.mock import MagicMock
+        from cleankoda.memory import Memory
+        from cleankoda.tui import TUI
+
+        memory = Memory(system_prompt="Test")
+        tui = TUI(memory)
+        mock_app = MagicMock()
+        tui.app = mock_app
+
+        # Initially default status line text
+        self.assertIn("Ctrl+O for shortcuts", tui.status_line.text)
+
+        # Setting status via status_manager automatically updates status line
+        tui.status_manager.set("sandbox", "Sandbox: Startet (docker:latest)...")
+        self.assertIn("▶ Sandbox: Startet (docker:latest)...", tui.status_line.text)
+        mock_app.invalidate.assert_called()
+
+        # Multiple slots are combined
+        tui.status_manager.set("llm", "LLM Cold Start: Versuch 1/10 (10s gewartet)")
+        self.assertIn(
+            "▶ Sandbox: Startet (docker:latest)... | LLM Cold Start: Versuch 1/10 (10s gewartet)",
+            tui.status_line.text,
+        )
+
+        # Clearing slots reverts back to Ctrl+O for shortcuts when empty
+        tui.status_manager.clear("sandbox")
+        tui.status_manager.clear("llm")
+        self.assertIn("Ctrl+O for shortcuts", tui.status_line.text)
+
+
 if __name__ == "__main__":
     unittest.main()

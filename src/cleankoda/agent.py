@@ -7,7 +7,7 @@ import litellm
 from cleankoda.commands import CommandContext, registry
 from cleankoda.memory import Memory
 from cleankoda.sandbox import SandboxManager
-from cleankoda.session_state import SessionState
+from cleankoda.session_state import SessionState, StatusManager
 from cleankoda.tools import TOOL_SCHEMAS, run_tool, sandbox_manager
 
 SYSTEM_PROMPT = """You are a coding agent running in the user's terminal.
@@ -16,7 +16,11 @@ Use your tools to complete the user's task, then briefly summarize what you did.
 The working directory is the folder the user launched you from."""
 
 
-def run_agent(memory: Memory, state: SessionState | None = None) -> str | None:
+def run_agent(
+    memory: Memory,
+    state: SessionState | None = None,
+    status_manager: StatusManager | None = None,
+) -> str | None:
     if state is None:
         state = SessionState.load()
 
@@ -44,7 +48,15 @@ def run_agent(memory: Memory, state: SessionState | None = None) -> str | None:
             return message.content
 
         for tool_call in tool_calls:
-            result = run_tool(tool_call)
+            func = getattr(tool_call, "function", None)
+            tool_name = getattr(func, "name", "unknown") if func else "unknown"
+            if status_manager:
+                status_manager.set("tool", f"Execute tool: {tool_name}...")
+            try:
+                result = run_tool(tool_call)
+            finally:
+                if status_manager:
+                    status_manager.clear("tool")
             tool_call_id = getattr(tool_call, "id", None)
             if not tool_call_id and isinstance(tool_call, dict):
                 tool_call_id = tool_call.get("id")

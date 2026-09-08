@@ -13,7 +13,7 @@ from litellm.exceptions import (
 )
 
 if TYPE_CHECKING:
-    from cleankoda.session_state import SessionState
+    from cleankoda.session_state import SessionState, StatusManager
 
 from cleankoda.tools import TOOL_SCHEMAS, run_tool
 
@@ -81,11 +81,12 @@ async def stream_chat_response(
     tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
     cancel_event: asyncio.Event | None = None,
     status_callback: Callable[[str | None], None] | None = None,
+    status_manager: "StatusManager | None" = None,
     initial_delay: float = 10.0,
     max_attempts: int = 10,
 ) -> AsyncGenerator[str, None]:
     """Streamt Antworten von LiteLLM basierend auf dem angegebenen SessionState und führt ggf. Tool-Calls aus.
-    Unterstützt automatische Retries bei Cold Starts mit exponentiellem Backoff, Status-Callbacks und Abbruch per cancel_event.
+    Unterstützt automatische Retries bei Cold Starts mit exponentiellem Backoff, StatusManager/Status-Callbacks und Abbruch per cancel_event.
     """
     litellm.suppress_debug_info = True
 
@@ -155,21 +156,29 @@ async def stream_chat_response(
                     content = getattr(delta, "content", None) or (delta.get("content") if isinstance(delta, dict) else None)
                     if content:
                         if attempt > 0 and not model_ready_notified:
+                            if status_manager:
+                                status_manager.clear("llm")
                             if status_callback:
                                 status_callback("✔ Model ready.")
                             else:
                                 yield "[green]✔ Model ready.[/green]\n"
                             model_ready_notified = True
                         yield content
+                if status_manager:
+                    status_manager.clear("llm")
                 if status_callback and model_ready_notified:
                     status_callback(None)
                 break
             except AuthenticationError as e:
+                if status_manager:
+                    status_manager.clear("llm")
                 if status_callback:
                     status_callback(None)
                 yield f"[Authentication Error ({state.provider}): Please check your API key. Details: {e}]"
                 return
             except RateLimitError as e:
+                if status_manager:
+                    status_manager.clear("llm")
                 if status_callback:
                     status_callback(None)
                 yield f"[Rate Limit Exceeded ({state.provider}): {e}]"
@@ -179,6 +188,8 @@ async def stream_chat_response(
                     attempt += 1
                     if attempt > max_attempts:
                         err_msg = f"LLM could not be started after {max_attempts} attempts."
+                        if status_manager:
+                            status_manager.clear("llm")
                         if status_callback:
                             status_callback(None)
                         yield f"[LLM Error ({state.provider}): {err_msg}]\n"
@@ -186,18 +197,21 @@ async def stream_chat_response(
 
                     current_delay = initial_delay * (2 ** (attempt - 1))
                     status_text = (
-                        f"⟳ LLM starts (Cold Start)... Attempt {attempt}/{max_attempts}. "
-                        f"Next in {int(current_delay)}s [Esc to cancel]"
+                        f"LLM Cold Start: attempt {attempt}/{max_attempts} ({int(current_delay)}s) [Esc to cancel]"
                     )
 
+                    if status_manager:
+                        status_manager.set("llm", status_text)
                     if status_callback:
                         status_callback(status_text)
-                    else:
-                        yield f"[yellow]{status_text}[/yellow]\n"
+                    if not status_manager and not status_callback:
+                        yield f"[yellow]⟳ {status_text}[/yellow]\n"
 
                     if cancel_event is not None:
                         try:
                             await asyncio.wait_for(cancel_event.wait(), timeout=current_delay)
+                            if status_manager:
+                                status_manager.clear("llm")
                             if status_callback:
                                 status_callback(None)
                             yield "[yellow]LLM startup aborted.[/yellow]\n"
@@ -207,6 +221,8 @@ async def stream_chat_response(
                     else:
                         await asyncio.sleep(current_delay)
                 else:
+                    if status_manager:
+                        status_manager.clear("llm")
                     if status_callback:
                         status_callback(None)
                     if isinstance(e, (APIConnectionError, ServiceUnavailableError)):
@@ -215,6 +231,8 @@ async def stream_chat_response(
                         yield f"[LLM Error ({state.provider}): {e}]"
                     return
             except Exception as e:
+                if status_manager:
+                    status_manager.clear("llm")
                 if status_callback:
                     status_callback(None)
                 yield f"[Unexpected Error ({state.provider}): {type(e).__name__} - {e}]"
@@ -274,7 +292,13 @@ async def stream_chat_response(
             display_str = format_tool_call_display(func_name, func_args)
             yield f"{display_str}\n"
 
-            tool_result = await run_tool(tool_call)
+            if status_manager:
+                status_manager.set("tool", f"Execute tool: {func_name}...")
+            try:
+                tool_result = await run_tool(tool_call)
+            finally:
+                if status_manager:
+                    status_manager.clear("tool")
 
             tool_msg = {
                 "role": "tool",

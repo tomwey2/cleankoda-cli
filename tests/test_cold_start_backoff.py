@@ -88,7 +88,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 self.assertEqual(delays_recorded, [10.0, 20.0])
                 self.assertIn("Versuch 1/10", output)
                 self.assertIn("Versuch 2/10", output)
-                self.assertIn("Modell bereit", output)
+                self.assertIn("✔ Model ready.", output)
                 self.assertIn("Model ready content", output)
 
         asyncio.run(_test())
@@ -123,7 +123,7 @@ class TestColdStartBackoff(unittest.TestCase):
 
                 output = "".join(chunks)
                 self.assertIn("Versuch 1/10", output)
-                self.assertIn("Start des LLMs abgebrochen.", output)
+                self.assertIn("LLM startup aborted.", output)
 
         asyncio.run(_test())
 
@@ -158,7 +158,7 @@ class TestColdStartBackoff(unittest.TestCase):
 
                 output = "".join(chunks)
                 self.assertEqual(call_count, 4)
-                self.assertIn("Serverless LLM konnte nach 3 Versuchen nicht gestartet werden.", output)
+                self.assertIn("LLM could not be started after 3 attempts.", output)
 
         asyncio.run(_test())
 
@@ -217,7 +217,64 @@ class TestColdStartBackoff(unittest.TestCase):
                 output = "".join(chunks)
                 self.assertEqual(output, "Ready content")
                 self.assertTrue(any("Versuch 1/10" in s for s in statuses_received if s))
-                self.assertIn("✔ Modell bereit.", statuses_received)
+                self.assertIn("✔ Model ready.", statuses_received)
+
+        asyncio.run(_test())
+
+    def test_status_manager_cold_start(self):
+        from cleankoda.session_state import StatusManager
+
+        async def _test():
+            state = SessionState(provider="custom", model="qwen")
+            messages = [{"role": "user", "content": "Hello"}]
+            sm = StatusManager()
+
+            call_count = 0
+
+            async def mock_acompletion(*args, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                if call_count == 1:
+                    raise ServiceUnavailableError(
+                        message="503 Service Unavailable: Loading model",
+                        response=MagicMock(status_code=503),
+                        llm_provider="custom",
+                        model="qwen",
+                    )
+                mock_chunk = {
+                    "id": "chatcmpl-test",
+                    "object": "chat.completion.chunk",
+                    "created": 12345,
+                    "model": "qwen",
+                    "choices": [{
+                        "index": 0,
+                        "delta": {"role": "assistant", "content": "Ready content"},
+                        "finish_reason": "stop"
+                    }]
+                }
+                yield mock_chunk
+
+            async def mock_wait_for(fut, timeout):
+                raise asyncio.TimeoutError()
+
+            with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
+                "asyncio.wait_for", side_effect=mock_wait_for
+            ):
+                chunks = []
+                async for token in stream_chat_response(
+                    messages,
+                    state,
+                    status_manager=sm,
+                    initial_delay=10.0,
+                    max_attempts=10,
+                ):
+                    chunks.append(token)
+
+                output = "".join(chunks)
+                self.assertIn("Ready content", output)
+                self.assertIn("✔ Model ready.", output)
+                # When finished, llm slot in sm should be cleared
+                self.assertEqual(sm.get_combined_status(), "")
 
         asyncio.run(_test())
 
