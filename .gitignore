@@ -1,4 +1,5 @@
 /.agents/memory.json
+.notes/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
