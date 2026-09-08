@@ -85,30 +85,101 @@ class SlashCommandCompleter(Completer):
 
 
 class ChatLexer(Lexer):
-    """Lexer that styles user lines starting with '>' in bold and parses inline Markdown formatting live."""
+    """Lexer that styles Markdown formatting and Rich markup tags (e.g. [yellow]...[/yellow]) in history_area."""
 
     def lex_document(self, document):
-        pattern = re.compile(r"(\*\*.*?\*\*|\*.*?\*|`.*?`)")
+        lines = document.lines
+        num_lines = len(lines)
 
-        def get_line(lineno):
-            line = document.lines[lineno]
-            if line.startswith(">"):
-                return [("bold", line)]
+        in_code_block = [False] * num_lines
+        code = False
+        for idx, line in enumerate(lines):
+            if line.strip().startswith("```"):
+                code = not code
+                in_code_block[idx] = True
+            else:
+                in_code_block[idx] = code
 
-            parts = pattern.split(line)
+        token_pattern = re.compile(
+            r"("
+            r"\[(yellow|green|red|cyan|blue|magenta|bold|italic|underline)\](.*?)\[/\2\]|"
+            r"\*\*(.*?)\*\*|"
+            r"__(.*?)__|"
+            r"\*(.*?)\*|"
+            r"_(.*?)_|"
+            r"`(.*?)`|"
+            r"\[(.*?)\]\((.*?)\)"
+            r")"
+        )
+
+        def parse_line_tokens(line: str, default_style: str = "") -> list[tuple[str, str]]:
             result = []
-            for part in parts:
-                if not part:
-                    continue
-                if part.startswith("**") and part.endswith("**") and len(part) >= 4:
-                    result.append(("bold", part[2:-2]))
-                elif part.startswith("*") and part.endswith("*") and len(part) >= 2:
-                    result.append(("italic", part[1:-1]))
-                elif part.startswith("`") and part.endswith("`") and len(part) >= 2:
-                    result.append(("underline", part[1:-1]))
+            pos = 0
+            for match in token_pattern.finditer(line):
+                start, end = match.span()
+                if start > pos:
+                    result.append((default_style, line[pos:start]))
+
+                full_match = match.group(1)
+                rich_tag_color = match.group(2)
+                rich_tag_content = match.group(3)
+                bold_star = match.group(4)
+                bold_under = match.group(5)
+                italic_star = match.group(6)
+                italic_under = match.group(7)
+                code_content = match.group(8)
+                link_text = match.group(9)
+
+                if rich_tag_color:
+                    style = f"fg:ansi{rich_tag_color}" if rich_tag_color != "bold" else "bold"
+                    if default_style:
+                        style = f"{default_style} {style}"
+                    result.append((style, rich_tag_content))
+                elif bold_star is not None or bold_under is not None:
+                    txt = bold_star if bold_star is not None else bold_under
+                    style = "bold" if not default_style else f"{default_style} bold"
+                    result.append((style, txt))
+                elif italic_star is not None or italic_under is not None:
+                    txt = italic_star if italic_star is not None else italic_under
+                    style = "italic" if not default_style else f"{default_style} italic"
+                    result.append((style, txt))
+                elif code_content is not None:
+                    style = "fg:ansicyan"
+                    result.append((style, code_content))
+                elif link_text is not None:
+                    style = "underline fg:ansiblue"
+                    result.append((style, link_text))
                 else:
-                    result.append(("", part))
-            return result
+                    result.append((default_style, full_match))
+
+                pos = end
+
+            if pos < len(line):
+                result.append((default_style, line[pos:]))
+
+            return result if result else [(default_style, "")]
+
+        def get_line(lineno: int):
+            if lineno >= num_lines:
+                return [("", "")]
+
+            line = lines[lineno]
+
+            if in_code_block[lineno]:
+                if line.strip().startswith("```"):
+                    return [("bold fg:ansicyan", line)]
+                return [("fg:ansicyan", line)]
+
+            if line.startswith(">"):
+                return parse_line_tokens(line, default_style="bold")
+
+            if line.startswith("#"):
+                return [("bold fg:ansiyellow", line)]
+
+            if line.lstrip().startswith(("- ", "* ", "• ")):
+                return parse_line_tokens(line)
+
+            return parse_line_tokens(line)
 
         return get_line
 

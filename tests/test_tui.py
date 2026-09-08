@@ -43,6 +43,54 @@ class TestSlashCommandCompleter(unittest.TestCase):
         self.assertEqual(len(completions), 0)
 
 
+class TestChatLexer(unittest.TestCase):
+
+    def test_rich_color_tags(self):
+        from cleankoda.tui import ChatLexer
+        doc = Document("[yellow]LLM startup aborted.[/yellow]\n[green]✔ Model ready.[/green]", 0)
+        lexer = ChatLexer()
+        get_line = lexer.lex_document(doc)
+
+        line0 = get_line(0)
+        self.assertEqual(line0, [("fg:ansiyellow", "LLM startup aborted.")])
+
+        line1 = get_line(1)
+        self.assertEqual(line1, [("fg:ansigreen", "✔ Model ready.")])
+
+    def test_markdown_inline(self):
+        from cleankoda.tui import ChatLexer
+        doc = Document("Hello **bold** and *italic* and `code` and [link](http://test)", 0)
+        lexer = ChatLexer()
+        get_line = lexer.lex_document(doc)
+
+        line0 = get_line(0)
+        styles_and_texts = [(style, text) for style, text in line0]
+        self.assertEqual(
+            styles_and_texts,
+            [
+                ("", "Hello "),
+                ("bold", "bold"),
+                ("", " and "),
+                ("italic", "italic"),
+                ("", " and "),
+                ("fg:ansicyan", "code"),
+                ("", " and "),
+                ("underline fg:ansiblue", "link"),
+            ],
+        )
+
+    def test_headers_and_code_blocks(self):
+        from cleankoda.tui import ChatLexer
+        doc = Document("# Header 1\n```python\nprint('hello')\n```", 0)
+        lexer = ChatLexer()
+        get_line = lexer.lex_document(doc)
+
+        self.assertEqual(get_line(0), [("bold fg:ansiyellow", "# Header 1")])
+        self.assertEqual(get_line(1), [("bold fg:ansicyan", "```python")])
+        self.assertEqual(get_line(2), [("fg:ansicyan", "print('hello')")])
+        self.assertEqual(get_line(3), [("bold fg:ansicyan", "```")])
+
+
 class TestTUIStyleAndConfig(unittest.TestCase):
 
     def test_tui_style_keys(self):
