@@ -19,11 +19,12 @@ class TestMainDualMode(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
+            state = SessionState.load()
             agent = Agent(
                 memory=mem,
-                llm_service=LLMService(),
+                llm_service=LLMService(state=state),
                 tools=TOOL_SCHEMAS,
-                state=SessionState.load(),
+                state=state,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -44,11 +45,12 @@ class TestMainDualMode(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
+            state = SessionState.load()
             agent = Agent(
                 memory=mem,
-                llm_service=LLMService(),
+                llm_service=LLMService(state=state),
                 tools=TOOL_SCHEMAS,
-                state=SessionState.load(),
+                state=state,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):

@@ -35,7 +35,7 @@ class TestLLMService(unittest.TestCase):
                 SessionState, "get_active_api_key", return_value="test-key"
             ):
                 chunks = []
-                async for token in LLMService().stream_completion(messages, state, tools=[]):
+                async for token in LLMService(state=state).stream_completion(messages, tools=[]):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Hello world!")
@@ -56,7 +56,7 @@ class TestLLMService(unittest.TestCase):
 
             with patch("litellm.acompletion", side_effect=mock_acompletion):
                 chunks = []
-                async for token in LLMService().stream_completion(messages, state, tools=[]):
+                async for token in LLMService(state=state).stream_completion(messages, tools=[]):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Ollama response")
@@ -77,7 +77,7 @@ class TestLLMService(unittest.TestCase):
 
             with patch("litellm.acompletion", side_effect=auth_err):
                 chunks = []
-                async for token in LLMService().stream_completion(messages, state, tools=[]):
+                async for token in LLMService(state=state).stream_completion(messages, tools=[]):
                     chunks.append(token)
 
                 result = "".join(chunks)
@@ -147,7 +147,7 @@ class TestLLMService(unittest.TestCase):
                 "cleankoda.agent.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
-                agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS, state=state)
+                agent = Agent(memory=mem, llm_service=LLMService(state=state), tools=TOOL_SCHEMAS, state=state)
                 async for token in agent.run():
                     chunks.append(token)
 
@@ -163,7 +163,7 @@ class TestLLMService(unittest.TestCase):
     def test_llm_service_class_instance_methods(self):
         from cleankoda.llm import LLMService
 
-        service = LLMService()
+        service = LLMService(state=SessionState(provider="openai", model="gpt-4o"))
         self.assertEqual(service.format_tool_call_display("read_file", '{"path": "test.py"}'), "read_file(test.py)")
         err = APIConnectionError(message="OpenAIException - Loading model", llm_provider="custom", model="qwen")
         self.assertTrue(service.is_cold_start_error(err))

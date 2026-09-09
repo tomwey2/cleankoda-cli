@@ -21,7 +21,8 @@ async def _run_headless_agent(
     agent: Agent,
 ) -> int:
     agent.memory.add_user(prompt_text)
-    agent.status_manager.on_change = headless_status_callback
+    if agent.status_manager is not None:
+        agent.status_manager.on_change = headless_status_callback
     try:
         async for chunk in agent.run():
             print(chunk, end="", flush=True)
@@ -81,9 +82,9 @@ def main(argv: list[str] | None = None) -> None:
         final_prompt = prompt or piped_input
 
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
-    status_manager = StatusManager()
-    llm_service = LLMService(status_manager=status_manager)
     state = SessionState.load()
+    status_manager = StatusManager()
+    llm_service = LLMService(state=state, status_manager=status_manager)
 
     agent = Agent(
         memory=memory,

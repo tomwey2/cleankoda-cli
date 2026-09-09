@@ -197,8 +197,8 @@ class TUI:
     ) -> None:
         if isinstance(agent, Memory):
             sm = status_manager or StatusManager()
-            ls = llm_service or LLMService(status_manager=sm)
             state = SessionState.load()
+            ls = llm_service or LLMService(state=state, status_manager=sm)
             self.agent = Agent(
                 memory=agent,
                 llm_service=ls,

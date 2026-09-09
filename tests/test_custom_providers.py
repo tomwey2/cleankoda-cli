@@ -121,7 +121,7 @@ class TestCustomProviders(unittest.TestCase):
 
                     with patch("litellm.acompletion", side_effect=mock_acompletion):
                         chunks = []
-                        async for token in LLMService().stream_completion(messages, state, tools=[]):
+                        async for token in LLMService(state=state).stream_completion(messages, tools=[]):
                             chunks.append(token)
 
                         self.assertEqual("".join(chunks), "Hello back")

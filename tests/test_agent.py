@@ -16,7 +16,7 @@ class TestAgentLoop(unittest.TestCase):
     def test_agent_class_instantiation(self):
         state = SessionState(provider="openai", model="gpt-4o")
         mem = Memory(system_prompt="Test")
-        ls = LLMService()
+        ls = LLMService(state=state)
         status_mgr = StatusManager()
         agent = Agent(
             memory=mem,
@@ -37,7 +37,7 @@ class TestAgentLoop(unittest.TestCase):
             mem = Memory(system_prompt="Test")
             mem.add_user("Hello agent")
 
-            async def mock_stream_llm(messages, state, **kwargs):
+            async def mock_stream_llm(messages, **kwargs):
                 chunks_out = kwargs.get("chunks_out")
                 if chunks_out is not None:
                     chunks_out.append({
@@ -55,7 +55,7 @@ class TestAgentLoop(unittest.TestCase):
 
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
-                agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS, state=state)
+                agent = Agent(memory=mem, llm_service=LLMService(state=state), tools=TOOL_SCHEMAS, state=state)
                 async for token in agent.run():
                     tokens.append(token)
 
@@ -71,7 +71,7 @@ class TestAgentLoop(unittest.TestCase):
             mem = Memory(system_prompt="Test")
             cancel_event = asyncio.Event()
 
-            async def mock_stream_llm(messages, state, **kwargs):
+            async def mock_stream_llm(messages, **kwargs):
                 self.assertEqual(kwargs.get("tools"), [{"type": "function", "function": {"name": "custom_tool"}}])
                 yield "Running tool..."
 
@@ -81,7 +81,7 @@ class TestAgentLoop(unittest.TestCase):
                 tokens = []
                 agent = Agent(
                     memory=mem,
-                    llm_service=LLMService(),
+                    llm_service=LLMService(state=state),
                     tools=[{"type": "function", "function": {"name": "custom_tool"}}],
                     state=state,
                 )
@@ -135,7 +135,7 @@ class TestAgentLoop(unittest.TestCase):
 
             call_count = 0
 
-            async def mock_stream_llm(messages, state, **kwargs):
+            async def mock_stream_llm(messages, **kwargs):
                 nonlocal call_count
                 call_count += 1
                 chunks_out = kwargs.get("chunks_out")
@@ -155,7 +155,7 @@ class TestAgentLoop(unittest.TestCase):
                 tokens = []
                 agent = Agent(
                     memory=mem,
-                    llm_service=LLMService(),
+                    llm_service=LLMService(state=state, status_manager=status_mgr),
                     tools=TOOL_SCHEMAS,
                     state=state,
                     status_manager=status_mgr,

@@ -49,7 +49,6 @@ class Agent:
 
             async for chunk in self.llm_service.stream_completion(
                 messages=self.memory,
-                state=self.state,
                 tools=self.tools,
                 cancel_event=cancel_event,
                 chunks_out=chunks,
@@ -123,4 +122,3 @@ class Agent:
                     "content": tool_result,
                 }
                 self.memory.add_message(tool_msg)
-
