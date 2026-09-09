@@ -2,7 +2,7 @@ import argparse
 import asyncio
 import sys
 
-from cleankoda.agent import SYSTEM_PROMPT, run_agent
+from cleankoda.agent import SYSTEM_PROMPT, Agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
@@ -16,27 +16,14 @@ def headless_status_callback(status: str) -> None:
         print(f"▶ {status}", file=sys.stderr)
 
 
-async def _run_headless_async(
+async def _run_headless_agent(
     prompt_text: str,
-    memory: Memory,
-    cancel_event: asyncio.Event | None = None,
-    llm_service: LLMService | None = None,
+    agent: Agent,
 ) -> int:
-    memory.add_user(prompt_text)
-    state = SessionState.load()
-    status_manager = StatusManager(on_change=headless_status_callback)
-    service = llm_service or LLMService(status_manager=status_manager)
-    if service.status_manager is None:
-        service.status_manager = status_manager
+    agent.memory.add_user(prompt_text)
+    agent.status_manager.on_change = headless_status_callback
     try:
-        async for chunk in run_agent(
-            memory=memory,
-            llm_service=service,
-            tools=TOOL_SCHEMAS,
-            state=state,
-            status_manager=status_manager,
-            cancel_event=cancel_event,
-        ):
+        async for chunk in agent.run():
             print(chunk, end="", flush=True)
         print()
         return 0
@@ -45,7 +32,10 @@ async def _run_headless_async(
         return 1
 
 
-def run_headless(prompt_text: str, memory: Memory, llm_service: LLMService | None = None) -> int:
+def run_headless(
+    prompt_text: str,
+    agent: Agent | None = None,
+) -> int:
     """Execute the prompt in headless mode without TUI.
 
     Returns exit code 0 on success, or 1 on failure.
@@ -53,13 +43,13 @@ def run_headless(prompt_text: str, memory: Memory, llm_service: LLMService | Non
     try:
         # Slash-Command Check
         if prompt_text.startswith("/"):
-            ctx = CommandContext(memory=memory)
+            ctx = CommandContext(memory=agent.memory)
             result = registry.dispatch(prompt_text, ctx)
             if result.output:
                 print(result.output)
             return 0
 
-        return asyncio.run(_run_headless_async(prompt_text, memory, llm_service=llm_service))
+        return asyncio.run(_run_headless_agent(prompt_text, agent))
     finally:
         sandbox_manager.stop()
 
@@ -93,18 +83,27 @@ def main(argv: list[str] | None = None) -> None:
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
     status_manager = StatusManager()
     llm_service = LLMService(status_manager=status_manager)
+    state = SessionState.load()
+
+    agent = Agent(
+        memory=memory,
+        llm_service=llm_service,
+        tools=TOOL_SCHEMAS,
+        state=state,
+        status_manager=status_manager,
+    )
 
     if args.tui:
-        run_tui(memory, status_manager=status_manager, llm_service=llm_service)
+        run_tui(agent)
     elif args.headless or final_prompt is not None:
         if not final_prompt:
             print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
             sys.exit(1)
-        code = run_headless(final_prompt, memory, llm_service=llm_service)
+        code = run_headless(final_prompt, agent=agent)
         if isinstance(code, int) and code != 0:
             sys.exit(code)
     else:
-        run_tui(memory, status_manager=status_manager, llm_service=llm_service)
+        run_tui(agent)
 
 
 if __name__ == "__main__":

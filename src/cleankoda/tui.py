@@ -12,7 +12,7 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
-from cleankoda.agent import run_agent
+from cleankoda.agent import Agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
@@ -191,16 +191,36 @@ class TUI:
 
     def __init__(
         self,
-        memory: Memory,
+        agent: Agent | Memory,
         status_manager: StatusManager | None = None,
         llm_service: LLMService | None = None,
     ) -> None:
-        self.memory = memory
-        self.status_manager = status_manager or StatusManager()
+        if isinstance(agent, Memory):
+            sm = status_manager or StatusManager()
+            ls = llm_service or LLMService(status_manager=sm)
+            state = SessionState.load()
+            self.agent = Agent(
+                memory=agent,
+                llm_service=ls,
+                tools=TOOL_SCHEMAS,
+                state=state,
+                status_manager=sm,
+            )
+        else:
+            self.agent = agent
+            if status_manager is not None:
+                self.agent.status_manager = status_manager
+            if llm_service is not None:
+                self.agent.llm_service = llm_service
+
+        if self.agent.status_manager is None:
+            self.agent.status_manager = StatusManager()
+        self.status_manager = self.agent.status_manager
         self.status_manager.on_change = self._on_status_changed
-        self.llm_service = llm_service or LLMService(status_manager=self.status_manager)
+        self.llm_service = self.agent.llm_service
         if self.llm_service.status_manager is None:
             self.llm_service.status_manager = self.status_manager
+        self.memory = self.agent.memory
         self.showing_shortcuts = False
         self.is_processing = False
         self._cancel_event: asyncio.Event | None = None
@@ -388,14 +408,9 @@ class TUI:
 
         self.cancel_event.clear()
 
-        state = SessionState.load()
-        async for chunk in run_agent(
-            memory=self.memory,
-            llm_service=self.llm_service,
-            tools=TOOL_SCHEMAS,
-            state=state,
+        self.agent.state = SessionState.load()
+        async for chunk in self.agent.run(
             cancel_event=self.cancel_event,
-            status_manager=self.status_manager,
         ):
             indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk
@@ -411,14 +426,10 @@ class TUI:
 
 
 def run_tui(
-    memory: Memory,
+    agent: Agent | Memory,
     status_manager: StatusManager | None = None,
     llm_service: LLMService | None = None,
 ) -> None:
-    """Start the interactive TUI application with the provided Memory instance."""
-    sm = status_manager or StatusManager()
-    ls = llm_service or LLMService(status_manager=sm)
-    if ls.status_manager is None:
-        ls.status_manager = sm
-    tui = TUI(memory, status_manager=sm, llm_service=ls)
+    """Start the interactive TUI application with the provided Agent instance."""
+    tui = TUI(agent, status_manager=status_manager, llm_service=llm_service)
     tui.run()

@@ -9,7 +9,7 @@ from litellm.exceptions import (
     RateLimitError,
 )
 
-from cleankoda.agent import run_agent
+from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.session_state import SessionState
 
@@ -147,7 +147,8 @@ class TestLLMService(unittest.TestCase):
                 "cleankoda.agent.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
-                async for token in run_agent(mem, LLMService(), TOOL_SCHEMAS, state):
+                agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS, state=state)
+                async for token in agent.run():
                     chunks.append(token)
 
                 output = "".join(chunks)

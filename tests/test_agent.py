@@ -4,7 +4,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from cleankoda.agent import run_agent
+from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState, StatusManager
@@ -12,6 +12,24 @@ from cleankoda.tools import TOOL_SCHEMAS
 
 
 class TestAgentLoop(unittest.TestCase):
+
+    def test_agent_class_instantiation(self):
+        state = SessionState(provider="openai", model="gpt-4o")
+        mem = Memory(system_prompt="Test")
+        ls = LLMService()
+        status_mgr = StatusManager()
+        agent = Agent(
+            memory=mem,
+            llm_service=ls,
+            tools=TOOL_SCHEMAS,
+            state=state,
+            status_manager=status_mgr,
+        )
+        self.assertEqual(agent.memory, mem)
+        self.assertEqual(agent.llm_service, ls)
+        self.assertEqual(agent.tools, TOOL_SCHEMAS)
+        self.assertEqual(agent.state, state)
+        self.assertEqual(agent.status_manager, status_mgr)
 
     def test_run_agent_basic_completion(self):
         async def _test():
@@ -37,7 +55,8 @@ class TestAgentLoop(unittest.TestCase):
 
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
-                async for token in run_agent(mem, LLMService(), TOOL_SCHEMAS, state):
+                agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS, state=state)
+                async for token in agent.run():
                     tokens.append(token)
 
             self.assertEqual("".join(tokens), "Hello user!")
@@ -60,13 +79,13 @@ class TestAgentLoop(unittest.TestCase):
 
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
-                async for token in run_agent(
-                    mem,
-                    LLMService(),
-                    [{"type": "function", "function": {"name": "custom_tool"}}],
-                    state,
-                    cancel_event=cancel_event,
-                ):
+                agent = Agent(
+                    memory=mem,
+                    llm_service=LLMService(),
+                    tools=[{"type": "function", "function": {"name": "custom_tool"}}],
+                    state=state,
+                )
+                async for token in agent.run(cancel_event=cancel_event):
                     tokens.append(token)
 
             self.assertIn("Agent execution cancelled.", "".join(tokens))
@@ -134,13 +153,14 @@ class TestAgentLoop(unittest.TestCase):
                 "cleankoda.agent.run_tool", return_value="file1.txt"
             ):
                 tokens = []
-                async for token in run_agent(
-                    mem,
-                    LLMService(),
-                    TOOL_SCHEMAS,
-                    state,
+                agent = Agent(
+                    memory=mem,
+                    llm_service=LLMService(),
+                    tools=TOOL_SCHEMAS,
+                    state=state,
                     status_manager=status_mgr,
-                ):
+                )
+                async for token in agent.run():
                     tokens.append(token)
 
                 output = "".join(tokens)

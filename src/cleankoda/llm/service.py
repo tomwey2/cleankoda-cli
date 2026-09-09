@@ -200,7 +200,7 @@ class LLMService:
                     if not choices:
                         continue
 
-                    # Store the raw stream chunk if caller (e.g. run_agent) provided a collector list for tool-call reconstruction
+                    # Store the raw stream chunk if caller (e.g. Agent.run) provided a collector list for tool-call reconstruction
                     if chunks_out is not None:
                         chunks_out.append(chunk)
 
