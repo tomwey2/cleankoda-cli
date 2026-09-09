@@ -19,7 +19,7 @@ DEFAULT_CONFIG_FILE = DEFAULT_CONFIG_DIR / "config.json"
 @dataclass
 class StatusManager:
     _slots: dict[str, str] = field(default_factory=dict)
-    on_change: Callable[[], None] | None = None
+    on_change: Callable[[str], None] | Callable[[], None] | None = None
 
     def set(self, source: str, message: str) -> None:
         """Sets or updates the status of a source and notifies observers."""
@@ -41,7 +41,11 @@ class StatusManager:
 
     def _notify(self) -> None:
         if self.on_change:
-            self.on_change()
+            combined = self.get_combined_status()
+            try:
+                self.on_change(combined)  # type: ignore[call-arg]
+            except TypeError:
+                self.on_change()  # type: ignore[call-arg]
 
 
 class SessionState(BaseModel):

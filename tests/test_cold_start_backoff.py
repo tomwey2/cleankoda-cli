@@ -199,6 +199,10 @@ class TestColdStartBackoff(unittest.TestCase):
             async def mock_wait_for(fut, timeout):
                 raise asyncio.TimeoutError()
 
+            from cleankoda.session_state import StatusManager
+
+            sm = StatusManager(on_change=status_cb)
+
             cancel_event = asyncio.Event()
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
                 "asyncio.wait_for", side_effect=mock_wait_for
@@ -208,7 +212,7 @@ class TestColdStartBackoff(unittest.TestCase):
                     messages,
                     state,
                     cancel_event=cancel_event,
-                    status_callback=status_cb,
+                    status_manager=sm,
                     initial_delay=10.0,
                     max_attempts=10,
                 ):
@@ -217,7 +221,6 @@ class TestColdStartBackoff(unittest.TestCase):
                 output = "".join(chunks)
                 self.assertEqual(output, "Ready content")
                 self.assertTrue(any("attempt 1/10" in s for s in statuses_received if s))
-                self.assertIn("✔ Model ready.", statuses_received)
 
         asyncio.run(_test())
 
@@ -272,7 +275,6 @@ class TestColdStartBackoff(unittest.TestCase):
 
                 output = "".join(chunks)
                 self.assertIn("Ready content", output)
-                self.assertIn("✔ Model ready.", output)
                 # When finished, llm slot in sm should be cleared
                 self.assertEqual(sm.get_combined_status(), "")
 

@@ -125,6 +125,8 @@ class TestAgentLoop(unittest.TestCase):
                         chunks_out.append(text_chunk)
                     yield "Done."
 
+            status_mgr = StatusManager(on_change=status_cb)
+
             with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm), patch(
                 "cleankoda.agent.run_tool", return_value="file1.txt"
             ):
@@ -132,7 +134,7 @@ class TestAgentLoop(unittest.TestCase):
                 async for token in run_agent(
                     mem,
                     state,
-                    status_callback=status_cb,
+                    status_manager=status_mgr,
                 ):
                     tokens.append(token)
 

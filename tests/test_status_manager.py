@@ -59,6 +59,19 @@ class TestStatusManager(unittest.TestCase):
         sm.clear("sandbox")
         self.assertEqual(notifications, 3)
 
+    def test_observer_on_change_with_argument(self):
+        statuses_received = []
+
+        def on_change_cb(status: str):
+            statuses_received.append(status)
+
+        sm = StatusManager(on_change=on_change_cb)
+        sm.set("tool", "Execute tool: list_files...")
+        self.assertEqual(statuses_received, ["Execute tool: list_files..."])
+
+        sm.clear("tool")
+        self.assertEqual(statuses_received, ["Execute tool: list_files...", ""])
+
 
 if __name__ == "__main__":
     unittest.main()

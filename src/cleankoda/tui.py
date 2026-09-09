@@ -257,7 +257,7 @@ class TUI:
         )
         self.app.float_container = self.float_container
 
-    def _on_status_changed(self) -> None:
+    def _on_status_changed(self, status: str = "") -> None:
         self.update_status_line()
         try:
             if hasattr(self, "app") and self.app:
@@ -389,7 +389,8 @@ class TUI:
             sandbox_manager.stop()
 
 
-def run_tui(memory: Memory, status_manager: StatusManager | None = None) -> None:
+def run_tui(memory: Memory) -> None:
     """Start the interactive TUI application with the provided Memory instance."""
+    status_manager = StatusManager()
     tui = TUI(memory, status_manager=status_manager)
     tui.run()

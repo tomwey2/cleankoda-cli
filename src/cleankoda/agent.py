@@ -23,7 +23,6 @@ async def run_agent(
     memory: Memory,
     state: SessionState,
     tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
-    status_callback: Callable[[str | None], None] | None = None,
     status_manager: StatusManager | None = None,
     cancel_event: asyncio.Event | None = None,
     max_tool_iterations: int = 10,
@@ -46,7 +45,6 @@ async def run_agent(
             state=state,
             tools=tools,
             cancel_event=cancel_event,
-            status_callback=status_callback,
             status_manager=status_manager,
             chunks_out=chunks,
         ):
@@ -104,19 +102,14 @@ async def run_agent(
             display_str = format_tool_call_display(func_name, func_args)
             yield f"{display_str}\n"
 
-            tool_status_msg = f"Execute tool: {func_name}..."
             if status_manager:
-                status_manager.set("tool", tool_status_msg)
-            if status_callback:
-                status_callback(tool_status_msg)
+                status_manager.set("tool", f"Execute tool: {func_name}...")
 
             try:
                 tool_result = await run_tool(tool_call)
             finally:
                 if status_manager:
                     status_manager.clear("tool")
-                if status_callback:
-                    status_callback(None)
 
             tool_msg = {
                 "role": "tool",

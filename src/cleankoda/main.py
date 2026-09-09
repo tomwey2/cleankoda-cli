@@ -5,12 +5,12 @@ import sys
 from cleankoda.agent import SYSTEM_PROMPT, run_agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.memory import Memory
-from cleankoda.session_state import SessionState
+from cleankoda.session_state import SessionState, StatusManager
 from cleankoda.tools import sandbox_manager
 from cleankoda.tui import run_tui
 
 
-def headless_status_callback(status: str | None) -> None:
+def headless_status_callback(status: str) -> None:
     if status:
         print(f"▶ {status}", file=sys.stderr)
 
@@ -18,11 +18,12 @@ def headless_status_callback(status: str | None) -> None:
 async def _run_headless_async(prompt_text: str, memory: Memory, cancel_event: asyncio.Event) -> int:
     memory.add_user(prompt_text)
     state = SessionState.load()
+    status_manager = StatusManager(on_change=headless_status_callback)
     try:
         async for chunk in run_agent(
             memory=memory,
             state=state,
-            status_callback=headless_status_callback,
+            status_manager=status_manager,
             cancel_event=cancel_event,
         ):
             print(chunk, end="", flush=True)

@@ -77,13 +77,10 @@ def format_tool_call_display(func_name: str, func_args: Any) -> str:
 
 def _clear_llm_status(
     status_manager: "StatusManager | None",
-    status_callback: Callable[[str | None], None] | None,
 ) -> None:
     """Helper to clear active LLM status indicators."""
     if status_manager:
         status_manager.clear("llm")
-    if status_callback:
-        status_callback(None)
 
 
 async def _wait_for_cold_start(
@@ -92,7 +89,6 @@ async def _wait_for_cold_start(
     max_attempts: int,
     initial_delay: float,
     status_manager: "StatusManager | None",
-    status_callback: Callable[[str | None], None] | None,
     cancel_event: asyncio.Event | None,
 ) -> tuple[list[str], bool]:
     """Handles cold start status notifications, exponential backoff delay, and cancellation checks.
@@ -103,7 +99,6 @@ async def _wait_for_cold_start(
         max_attempts: Maximum allowed retries.
         initial_delay: Base delay in seconds.
         status_manager: Optional StatusManager instance.
-        status_callback: Optional status callback function.
         cancel_event: Optional asyncio.Event to trigger early abort.
 
     Returns:
@@ -111,7 +106,7 @@ async def _wait_for_cold_start(
     """
     if attempt > max_attempts:
         err_msg = f"LLM could not be started after {max_attempts} attempts."
-        _clear_llm_status(status_manager, status_callback)
+        _clear_llm_status(status_manager)
         return [f"[LLM Error ({provider}): {err_msg}]\n"], False
 
     # Calculate exponential backoff delay (10s, 20s, 40s, ...)
@@ -122,18 +117,16 @@ async def _wait_for_cold_start(
 
     if status_manager:
         status_manager.set("llm", status_text)
-    if status_callback:
-        status_callback(status_text)
 
     output_messages: list[str] = []
-    if not status_manager and not status_callback:
+    if not status_manager:
         output_messages.append(f"[yellow]⟳ {status_text}[/yellow]\n")
 
     # Wait for delay or handle cancel_event
     if cancel_event is not None:
         try:
             await asyncio.wait_for(cancel_event.wait(), timeout=current_delay)
-            _clear_llm_status(status_manager, status_callback)
+            _clear_llm_status(status_manager)
             output_messages.append("[yellow]LLM startup aborted.[/yellow]\n")
             return output_messages, False
         except asyncio.TimeoutError:
@@ -149,7 +142,6 @@ async def stream_llm_completion(
     state: "SessionState | Any",
     tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
     cancel_event: asyncio.Event | None = None,
-    status_callback: Callable[[str | None], None] | None = None,
     status_manager: "StatusManager | None" = None,
     initial_delay: float = 10.0,
     max_attempts: int = 10,
@@ -165,7 +157,6 @@ async def stream_llm_completion(
         state: Active SessionState configuration (provider, model, temperature, etc.).
         tools: Optional list of tool schemas for function calling.
         cancel_event: Optional asyncio.Event to trigger early cancellation during retries.
-        status_callback: Optional callback for reporting status text (e.g. cold start warnings).
         status_manager: Optional StatusManager for updating UI status slots.
         initial_delay: Base delay in seconds for exponential backoff during cold starts.
         max_attempts: Maximum retry attempts for cold start errors.
@@ -218,6 +209,8 @@ async def stream_llm_completion(
     while True:
         try:
             # Initiate streaming completion via LiteLLM (`acompletion` returns an async generator of stream chunks)
+            if status_manager:
+                status_manager.set("llm", "call llm")
             response = await litellm.acompletion(**kwargs)
 
             # Iterate through incoming streaming chunks as they arrive from the LLM provider
@@ -249,8 +242,6 @@ async def stream_llm_completion(
                     if attempt > 0 and not model_ready_notified:
                         if status_manager:
                             status_manager.clear("llm")
-                        if status_callback:
-                            status_callback("✔ Model ready.")
                         else:
                             yield "[green]✔ Model ready.[/green]\n"
                         model_ready_notified = True
@@ -258,16 +249,16 @@ async def stream_llm_completion(
                     # Yield content token immediately to stream it live to UI / CLI
                     yield content
 
-            _clear_llm_status(status_manager, status_callback)
+            _clear_llm_status(status_manager)
             break
 
         # --- Step 3: Error Handling & Cold Start Retries ---
         except AuthenticationError as e:
-            _clear_llm_status(status_manager, status_callback)
+            _clear_llm_status(status_manager)
             yield f"[Authentication Error ({state.provider}): Please check your API key. Details: {e}]"
             return
         except RateLimitError as e:
-            _clear_llm_status(status_manager, status_callback)
+            _clear_llm_status(status_manager)
             yield f"[Rate Limit Exceeded ({state.provider}): {e}]"
             return
         except (ServiceUnavailableError, APIConnectionError, APIError) as e:
@@ -279,7 +270,6 @@ async def stream_llm_completion(
                     max_attempts=max_attempts,
                     initial_delay=initial_delay,
                     status_manager=status_manager,
-                    status_callback=status_callback,
                     cancel_event=cancel_event,
                 )
                 for msg in messages_to_yield:
@@ -287,14 +277,13 @@ async def stream_llm_completion(
                 if not should_retry:
                     return
             else:
-                _clear_llm_status(status_manager, status_callback)
+                _clear_llm_status(status_manager)
                 if isinstance(e, (APIConnectionError, ServiceUnavailableError)):
                     yield f"[Connection Error ({state.provider}): Unable to reach server. {e}]"
                 else:
                     yield f"[LLM Error ({state.provider}): {e}]"
                 return
         except Exception as e:
-            _clear_llm_status(status_manager, status_callback)
+            _clear_llm_status(status_manager)
             yield f"[Unexpected Error ({state.provider}): {type(e).__name__} - {e}]"
             return
-
