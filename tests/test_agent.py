@@ -5,8 +5,10 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from cleankoda.agent import run_agent
+from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState, StatusManager
+from cleankoda.tools import TOOL_SCHEMAS
 
 
 class TestAgentLoop(unittest.TestCase):
@@ -33,9 +35,9 @@ class TestAgentLoop(unittest.TestCase):
                     })
                 yield "Hello user!"
 
-            with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm):
+            with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
-                async for token in run_agent(mem, state):
+                async for token in run_agent(mem, LLMService(), TOOL_SCHEMAS, state):
                     tokens.append(token)
 
             self.assertEqual("".join(tokens), "Hello user!")
@@ -56,12 +58,13 @@ class TestAgentLoop(unittest.TestCase):
 
             cancel_event.set()
 
-            with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm):
+            with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
                 async for token in run_agent(
                     mem,
+                    LLMService(),
+                    [{"type": "function", "function": {"name": "custom_tool"}}],
                     state,
-                    tools=[{"type": "function", "function": {"name": "custom_tool"}}],
                     cancel_event=cancel_event,
                 ):
                     tokens.append(token)
@@ -127,12 +130,14 @@ class TestAgentLoop(unittest.TestCase):
 
             status_mgr = StatusManager(on_change=status_cb)
 
-            with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm), patch(
+            with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm), patch(
                 "cleankoda.agent.run_tool", return_value="file1.txt"
             ):
                 tokens = []
                 async for token in run_agent(
                     mem,
+                    LLMService(),
+                    TOOL_SCHEMAS,
                     state,
                     status_manager=status_mgr,
                 ):

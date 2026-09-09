@@ -14,9 +14,10 @@ from prompt_toolkit.widgets import Frame, TextArea
 
 from cleankoda.agent import run_agent
 from cleankoda.commands import CommandContext, registry
+from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState, StatusManager
-from cleankoda.tools import get_sandbox_status, sandbox_manager
+from cleankoda.tools import TOOL_SCHEMAS, get_sandbox_status, sandbox_manager
 
 
 BANNER = """
@@ -100,35 +101,36 @@ class ChatLexer(Lexer):
             else:
                 in_code_block[idx] = code
 
-        token_pattern = re.compile(
-            r"("
-            r"\[(yellow|green|red|cyan|blue|magenta|bold|italic|underline)\](.*?)\[/\2\]|"
-            r"\*\*(.*?)\*\*|"
-            r"__(.*?)__|"
-            r"\*(.*?)\*|"
-            r"_(.*?)_|"
-            r"`(.*?)`|"
-            r"\[(.*?)\]\((.*?)\)"
-            r")"
+        import re
+
+        pattern = re.compile(
+            r'(\[(\w+)\b[^\]]*\](.*?)\[/\2\])|'
+            r'(\*\*(.*?)\*\*)|'
+            r'(__([^_]+)__)|'
+            r'(\*(.*?)\*)|'
+            r'(_([^_]+)_)|'
+            r'(`([^`]+)`)|'
+            r'(\[(.*?)\]\((.*?)\))'
         )
 
-        def parse_line_tokens(line: str, default_style: str = "") -> list[tuple[str, str]]:
+        def parse_line_tokens(line: str, default_style: str = ""):
             result = []
             pos = 0
-            for match in token_pattern.finditer(line):
+            for match in pattern.finditer(line):
                 start, end = match.span()
                 if start > pos:
                     result.append((default_style, line[pos:start]))
 
                 full_match = match.group(1)
+
                 rich_tag_color = match.group(2)
                 rich_tag_content = match.group(3)
-                bold_star = match.group(4)
-                bold_under = match.group(5)
-                italic_star = match.group(6)
-                italic_under = match.group(7)
-                code_content = match.group(8)
-                link_text = match.group(9)
+                bold_star = match.group(5)
+                bold_under = match.group(7)
+                italic_star = match.group(9)
+                italic_under = match.group(11)
+                code_content = match.group(13)
+                link_text = match.group(15)
 
                 if rich_tag_color:
                     style = f"fg:ansi{rich_tag_color}" if rich_tag_color != "bold" else "bold"
@@ -187,13 +189,21 @@ class ChatLexer(Lexer):
 class TUI:
     """Terminal User Interface application for cleankoda cli."""
 
-    def __init__(self, memory: Memory, status_manager: StatusManager | None = None) -> None:
+    def __init__(
+        self,
+        memory: Memory,
+        status_manager: StatusManager | None = None,
+        llm_service: LLMService | None = None,
+    ) -> None:
         self.memory = memory
         self.status_manager = status_manager or StatusManager()
         self.status_manager.on_change = self._on_status_changed
+        self.llm_service = llm_service or LLMService(status_manager=self.status_manager)
+        if self.llm_service.status_manager is None:
+            self.llm_service.status_manager = self.status_manager
         self.showing_shortcuts = False
         self.is_processing = False
-        self.cancel_event = asyncio.Event()
+        self._cancel_event: asyncio.Event | None = None
 
         self.history_area = TextArea(
             text=BANNER
@@ -264,6 +274,12 @@ class TUI:
                 self.app.invalidate()
         except Exception:
             pass
+
+    @property
+    def cancel_event(self) -> asyncio.Event:
+        if self._cancel_event is None:
+            self._cancel_event = asyncio.Event()
+        return self._cancel_event
 
     def get_session_status_text(self) -> str:
         state = SessionState.load()
@@ -374,7 +390,12 @@ class TUI:
 
         state = SessionState.load()
         async for chunk in run_agent(
-            memory=self.memory, state=state, cancel_event=self.cancel_event, status_manager=self.status_manager
+            memory=self.memory,
+            llm_service=self.llm_service,
+            tools=TOOL_SCHEMAS,
+            state=state,
+            cancel_event=self.cancel_event,
+            status_manager=self.status_manager,
         ):
             indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk
@@ -389,8 +410,15 @@ class TUI:
             sandbox_manager.stop()
 
 
-def run_tui(memory: Memory) -> None:
+def run_tui(
+    memory: Memory,
+    status_manager: StatusManager | None = None,
+    llm_service: LLMService | None = None,
+) -> None:
     """Start the interactive TUI application with the provided Memory instance."""
-    status_manager = StatusManager()
-    tui = TUI(memory, status_manager=status_manager)
+    sm = status_manager or StatusManager()
+    ls = llm_service or LLMService(status_manager=sm)
+    if ls.status_manager is None:
+        ls.status_manager = sm
+    tui = TUI(memory, status_manager=sm, llm_service=ls)
     tui.run()

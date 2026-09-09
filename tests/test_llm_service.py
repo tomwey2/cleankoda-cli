@@ -10,7 +10,7 @@ from litellm.exceptions import (
 )
 
 from cleankoda.agent import run_agent
-from cleankoda.llm import stream_llm_completion
+from cleankoda.llm import LLMService
 from cleankoda.session_state import SessionState
 
 
@@ -21,10 +21,8 @@ class TestLLMService(unittest.TestCase):
             state = SessionState(provider="openai", model="gpt-4o")
             messages = [{"role": "user", "content": "Hello"}]
 
-            mock_chunk1 = MagicMock()
-            mock_chunk1.choices = [MagicMock(delta=MagicMock(content="Hello"))]
-            mock_chunk2 = MagicMock()
-            mock_chunk2.choices = [MagicMock(delta=MagicMock(content=" world!"))]
+            mock_chunk1 = {"choices": [{"delta": {"content": "Hello"}}]}
+            mock_chunk2 = {"choices": [{"delta": {"content": " world!"}}]}
 
             async def mock_acompletion(*args, **kwargs):
                 self.assertEqual(kwargs.get("model"), "openai/gpt-4o")
@@ -37,7 +35,7 @@ class TestLLMService(unittest.TestCase):
                 SessionState, "get_active_api_key", return_value="test-key"
             ):
                 chunks = []
-                async for token in stream_llm_completion(messages, state):
+                async for token in LLMService().stream_completion(messages, state, tools=[]):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Hello world!")
@@ -53,13 +51,12 @@ class TestLLMService(unittest.TestCase):
                 self.assertEqual(kwargs.get("api_key"), "dummy")
                 self.assertEqual(kwargs.get("api_base"), "http://localhost:11434/v1")
                 self.assertEqual(kwargs.get("model"), "ollama/llama3.3")
-                mock_chunk = MagicMock()
-                mock_chunk.choices = [MagicMock(delta=MagicMock(content="Ollama response"))]
+                mock_chunk = {"choices": [{"delta": {"content": "Ollama response"}}]}
                 yield mock_chunk
 
             with patch("litellm.acompletion", side_effect=mock_acompletion):
                 chunks = []
-                async for token in stream_llm_completion(messages, state):
+                async for token in LLMService().stream_completion(messages, state, tools=[]):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Ollama response")
@@ -80,7 +77,7 @@ class TestLLMService(unittest.TestCase):
 
             with patch("litellm.acompletion", side_effect=auth_err):
                 chunks = []
-                async for token in stream_llm_completion(messages, state):
+                async for token in LLMService().stream_completion(messages, state, tools=[]):
                     chunks.append(token)
 
                 result = "".join(chunks)
@@ -143,11 +140,14 @@ class TestLLMService(unittest.TestCase):
                 else:
                     yield chunk_text_2
 
+            from cleankoda.llm import LLMService
+            from cleankoda.tools import TOOL_SCHEMAS
+
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
                 "cleankoda.agent.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
-                async for token in run_agent(mem, state):
+                async for token in run_agent(mem, LLMService(), TOOL_SCHEMAS, state):
                     chunks.append(token)
 
                 output = "".join(chunks)
@@ -158,6 +158,14 @@ class TestLLMService(unittest.TestCase):
                 self.assertEqual(call_count, 2)
 
         asyncio.run(_test())
+
+    def test_llm_service_class_instance_methods(self):
+        from cleankoda.llm import LLMService
+
+        service = LLMService()
+        self.assertEqual(service.format_tool_call_display("read_file", '{"path": "test.py"}'), "read_file(test.py)")
+        err = APIConnectionError(message="OpenAIException - Loading model", llm_provider="custom", model="qwen")
+        self.assertTrue(service.is_cold_start_error(err))
 
 
 if __name__ == "__main__":

@@ -44,19 +44,19 @@ class TestMainDualMode(unittest.TestCase):
     @patch("cleankoda.main.run_headless")
     def test_main_with_positional_prompt(self, mock_run_headless):
         main(["Explain", "this", "code"])
-        mock_run_headless.assert_called_once_with("Explain this code", ANY)
+        mock_run_headless.assert_called_once_with("Explain this code", ANY, llm_service=ANY)
 
     @patch("cleankoda.main.run_tui")
     def test_main_with_tui_flag(self, mock_run_tui):
         main(["--tui"])
-        mock_run_tui.assert_called_once()
+        mock_run_tui.assert_called_once_with(ANY, status_manager=ANY, llm_service=ANY)
 
     @patch("cleankoda.main.run_headless")
     def test_main_with_piped_input(self, mock_run_headless):
         with patch("sys.stdin.isatty", return_value=False):
             with patch("sys.stdin.read", return_value="Piped input prompt"):
                 main([])
-                mock_run_headless.assert_called_once_with("Piped input prompt", ANY)
+                mock_run_headless.assert_called_once_with("Piped input prompt", ANY, llm_service=ANY)
 
     def test_main_headless_missing_prompt_exits(self):
         with patch("sys.stdin.isatty", return_value=True):

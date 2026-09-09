@@ -7,7 +7,7 @@ from typing import Any, AsyncGenerator, Callable
 from litellm import stream_chunk_builder
 
 from cleankoda.commands import CommandContext, registry
-from cleankoda.llm import format_tool_call_display, stream_llm_completion
+from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.sandbox import SandboxManager
 from cleankoda.session_state import SessionState, StatusManager
@@ -21,8 +21,9 @@ The working directory is the folder the user launched you from."""
 
 async def run_agent(
     memory: Memory,
+    llm_service: LLMService,
+    tools: list[dict[str, Any]],
     state: SessionState,
-    tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
     status_manager: StatusManager | None = None,
     cancel_event: asyncio.Event | None = None,
     max_tool_iterations: int = 10,
@@ -40,12 +41,11 @@ async def run_agent(
         iteration += 1
         chunks: list[Any] = []
 
-        async for chunk in stream_llm_completion(
+        async for chunk in llm_service.stream_completion(
             messages=memory,
             state=state,
             tools=tools,
             cancel_event=cancel_event,
-            status_manager=status_manager,
             chunks_out=chunks,
         ):
             yield chunk
@@ -99,7 +99,7 @@ async def run_agent(
             func_args = getattr(func, "arguments", "") if func else ""
             tool_call_id = getattr(tool_call, "id", "") or f"call_{func_name}"
 
-            display_str = format_tool_call_display(func_name, func_args)
+            display_str = llm_service.format_tool_call_display(func_name, func_args)
             yield f"{display_str}\n"
 
             if status_manager:

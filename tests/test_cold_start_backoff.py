@@ -8,7 +8,7 @@ from litellm.exceptions import (
     ServiceUnavailableError,
 )
 
-from cleankoda.llm.service import is_cold_start_error, stream_llm_completion
+from cleankoda.llm.service import LLMService
 from cleankoda.session_state import SessionState
 
 
@@ -21,14 +21,15 @@ class TestColdStartBackoff(unittest.TestCase):
             llm_provider="custom",
             model="qwen",
         )
-        self.assertTrue(is_cold_start_error(err_503))
+        service = LLMService()
+        self.assertTrue(service.is_cold_start_error(err_503))
 
         err_loading = APIConnectionError(
             message="OpenAIException - Loading model",
             llm_provider="custom",
             model="qwen",
         )
-        self.assertTrue(is_cold_start_error(err_loading))
+        self.assertTrue(service.is_cold_start_error(err_loading))
 
         err_other = APIError(
             message="Invalid arguments",
@@ -36,7 +37,7 @@ class TestColdStartBackoff(unittest.TestCase):
             model="qwen",
             status_code=400,
         )
-        self.assertFalse(is_cold_start_error(err_other))
+        self.assertFalse(service.is_cold_start_error(err_other))
 
     def test_exponential_backoff_retry_success(self):
         async def _test():
@@ -78,8 +79,8 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_llm_completion(
-                    messages, state, cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
+                async for token in LLMService().stream_completion(
+                    messages, state, tools=[], cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
                 ):
                     chunks.append(token)
 
@@ -116,8 +117,8 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_llm_completion(
-                    messages, state, cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
+                async for token in LLMService().stream_completion(
+                    messages, state, tools=[], cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
                 ):
                     chunks.append(token)
 
@@ -151,8 +152,8 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_llm_completion(
-                    messages, state, initial_delay=1.0, max_attempts=3
+                async for token in LLMService().stream_completion(
+                    messages, state, tools=[], initial_delay=1.0, max_attempts=3
                 ):
                     chunks.append(token)
 
@@ -208,11 +209,11 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_llm_completion(
+                async for token in LLMService(status_manager=sm).stream_completion(
                     messages,
                     state,
+                    tools=[],
                     cancel_event=cancel_event,
-                    status_manager=sm,
                     initial_delay=10.0,
                     max_attempts=10,
                 ):
@@ -264,10 +265,10 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_llm_completion(
+                async for token in LLMService(status_manager=sm).stream_completion(
                     messages,
                     state,
-                    status_manager=sm,
+                    tools=[],
                     initial_delay=10.0,
                     max_attempts=10,
                 ):

@@ -14,10 +14,7 @@ from cleankoda.llm.credentials import (
     DEFAULT_CREDENTIALS_FILE,
     CredentialsStore,
 )
-from cleankoda.llm.service import (
-    format_tool_call_display,
-    stream_llm_completion,
-)
+from cleankoda.llm.service import LLMService
 
 __all__ = [
     "PROVIDERS",
@@ -32,7 +29,6 @@ __all__ = [
     "CredentialsStore",
     "DEFAULT_CREDENTIALS_DIR",
     "DEFAULT_CREDENTIALS_FILE",
-    "stream_llm_completion",
-    "format_tool_call_display",
+    "LLMService",
 ]
 

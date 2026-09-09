@@ -15,7 +15,7 @@ from cleankoda.llm.config import (
     get_provider_configs,
     load_provider_registry,
 )
-from cleankoda.llm.service import stream_llm_completion
+from cleankoda.llm.service import LLMService
 from cleankoda.session_state import SessionState
 
 
@@ -114,13 +114,14 @@ class TestCustomProviders(unittest.TestCase):
                         self.assertEqual(kwargs.get("api_base"), "http://localhost:8000/v1")
                         self.assertEqual(kwargs.get("api_key"), "dummy")
                         self.assertEqual(kwargs.get("model"), "openai/meta-llama/Llama-3-8b")
-                        mock_chunk = MagicMock()
-                        mock_chunk.choices = [MagicMock(delta=MagicMock(content="Hello back"))]
+                        mock_chunk = {
+                            "choices": [{"delta": {"content": "Hello back"}}]
+                        }
                         yield mock_chunk
 
                     with patch("litellm.acompletion", side_effect=mock_acompletion):
                         chunks = []
-                        async for token in stream_llm_completion(messages, state):
+                        async for token in LLMService().stream_completion(messages, state, tools=[]):
                             chunks.append(token)
 
                         self.assertEqual("".join(chunks), "Hello back")
