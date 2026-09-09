@@ -140,16 +140,16 @@ class TestColdStartBackoff(unittest.TestCase):
                 call_count += 1
                 raise ServiceUnavailableError(
                     message="503 Service Unavailable: Loading model",
-                    response=MagicMock(status_code=503),
+                    response=MagicMock(spec=["status_code"], status_code=503),
                     llm_provider="custom",
                     model="qwen",
                 )
 
-            async def mock_wait_for(fut, timeout):
-                raise asyncio.TimeoutError()
+            async def mock_sleep(delay):
+                pass
 
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
-                "asyncio.wait_for", side_effect=mock_wait_for
+                "asyncio.sleep", side_effect=mock_sleep
             ):
                 chunks = []
                 async for token in LLMService().stream_completion(
@@ -258,11 +258,11 @@ class TestColdStartBackoff(unittest.TestCase):
                 }
                 yield mock_chunk
 
-            async def mock_wait_for(fut, timeout):
-                raise asyncio.TimeoutError()
+            async def mock_sleep(delay):
+                pass
 
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
-                "asyncio.wait_for", side_effect=mock_wait_for
+                "asyncio.sleep", side_effect=mock_sleep
             ):
                 chunks = []
                 async for token in LLMService(status_manager=sm).stream_completion(
