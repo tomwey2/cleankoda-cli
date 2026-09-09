@@ -27,9 +27,13 @@ class TestMainDualMode(unittest.TestCase):
         from pathlib import Path
         from cleankoda.memory import Memory
 
+        async def _mock_run_agent(*args, **kwargs):
+            yield "Test response from agent"
+
+        mock_run_agent.side_effect = _mock_run_agent
+
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
-            mock_run_agent.return_value = "Test response from agent"
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
                 run_headless("What is 1+1?", mem)

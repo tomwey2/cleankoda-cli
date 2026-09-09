@@ -1,11 +1,36 @@
 import argparse
+import asyncio
 import sys
 
 from cleankoda.agent import SYSTEM_PROMPT, run_agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.memory import Memory
+from cleankoda.session_state import SessionState
 from cleankoda.tools import sandbox_manager
 from cleankoda.tui import run_tui
+
+
+def headless_status_callback(status: str | None) -> None:
+    if status:
+        print(f"▶ {status}", file=sys.stderr)
+
+
+async def _run_headless_async(prompt_text: str, memory: Memory, cancel_event: asyncio.Event) -> int:
+    memory.add_user(prompt_text)
+    state = SessionState.load()
+    try:
+        async for chunk in run_agent(
+            memory=memory,
+            state=state,
+            status_callback=headless_status_callback,
+            cancel_event=cancel_event,
+        ):
+            print(chunk, end="", flush=True)
+        print()
+        return 0
+    except Exception as e:
+        print(f"Error running agent: {e}", file=sys.stderr)
+        return 1
 
 
 def run_headless(prompt_text: str, memory: Memory) -> int:
@@ -22,15 +47,8 @@ def run_headless(prompt_text: str, memory: Memory) -> int:
                 print(result.output)
             return 0
 
-        memory.add_user(prompt_text)
-        try:
-            response = run_agent(memory)
-            if response:
-                print(response)
-            return 0
-        except Exception as e:
-            print(f"Error running agent: {e}", file=sys.stderr)
-            return 1
+        cancel_event = asyncio.Event()
+        return asyncio.run(_run_headless_async(prompt_text, memory, cancel_event))
     finally:
         sandbox_manager.stop()
 

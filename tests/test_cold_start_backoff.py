@@ -8,7 +8,7 @@ from litellm.exceptions import (
     ServiceUnavailableError,
 )
 
-from cleankoda.llm.service import is_cold_start_error, stream_chat_response
+from cleankoda.llm.service import is_cold_start_error, stream_llm_completion
 from cleankoda.session_state import SessionState
 
 
@@ -78,7 +78,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_chat_response(
+                async for token in stream_llm_completion(
                     messages, state, cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
                 ):
                     chunks.append(token)
@@ -86,8 +86,8 @@ class TestColdStartBackoff(unittest.TestCase):
                 output = "".join(chunks)
                 self.assertEqual(call_count, 3)
                 self.assertEqual(delays_recorded, [10.0, 20.0])
-                self.assertIn("Versuch 1/10", output)
-                self.assertIn("Versuch 2/10", output)
+                self.assertIn("attempt 1/10", output)
+                self.assertIn("attempt 2/10", output)
                 self.assertIn("✔ Model ready.", output)
                 self.assertIn("Model ready content", output)
 
@@ -116,13 +116,13 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_chat_response(
+                async for token in stream_llm_completion(
                     messages, state, cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
                 ):
                     chunks.append(token)
 
                 output = "".join(chunks)
-                self.assertIn("Versuch 1/10", output)
+                self.assertIn("attempt 1/10", output)
                 self.assertIn("LLM startup aborted.", output)
 
         asyncio.run(_test())
@@ -151,7 +151,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_chat_response(
+                async for token in stream_llm_completion(
                     messages, state, initial_delay=1.0, max_attempts=3
                 ):
                     chunks.append(token)
@@ -204,7 +204,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_chat_response(
+                async for token in stream_llm_completion(
                     messages,
                     state,
                     cancel_event=cancel_event,
@@ -216,7 +216,7 @@ class TestColdStartBackoff(unittest.TestCase):
 
                 output = "".join(chunks)
                 self.assertEqual(output, "Ready content")
-                self.assertTrue(any("Versuch 1/10" in s for s in statuses_received if s))
+                self.assertTrue(any("attempt 1/10" in s for s in statuses_received if s))
                 self.assertIn("✔ Model ready.", statuses_received)
 
         asyncio.run(_test())
@@ -261,7 +261,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in stream_chat_response(
+                async for token in stream_llm_completion(
                     messages,
                     state,
                     status_manager=sm,

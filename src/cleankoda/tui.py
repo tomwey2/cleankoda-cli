@@ -12,8 +12,8 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
+from cleankoda.agent import run_agent
 from cleankoda.commands import CommandContext, registry
-from cleankoda.llm import stream_chat_response
 from cleankoda.memory import Memory
 from cleankoda.session_state import SessionState, StatusManager
 from cleankoda.tools import get_sandbox_status, sandbox_manager
@@ -373,8 +373,8 @@ class TUI:
         self.cancel_event.clear()
 
         state = SessionState.load()
-        async for chunk in stream_chat_response(
-            self.memory, state, cancel_event=self.cancel_event, status_manager=self.status_manager
+        async for chunk in run_agent(
+            memory=self.memory, state=state, cancel_event=self.cancel_event, status_manager=self.status_manager
         ):
             indented_chunk = chunk.replace("\n", "\n  ")
             self.history_area.text += indented_chunk

@@ -15,7 +15,7 @@ from cleankoda.llm.config import (
     get_provider_configs,
     load_provider_registry,
 )
-from cleankoda.llm.service import stream_chat_response
+from cleankoda.llm.service import stream_llm_completion
 from cleankoda.session_state import SessionState
 
 
@@ -120,7 +120,7 @@ class TestCustomProviders(unittest.TestCase):
 
                     with patch("litellm.acompletion", side_effect=mock_acompletion):
                         chunks = []
-                        async for token in stream_chat_response(messages, state):
+                        async for token in stream_llm_completion(messages, state):
                             chunks.append(token)
 
                         self.assertEqual("".join(chunks), "Hello back")

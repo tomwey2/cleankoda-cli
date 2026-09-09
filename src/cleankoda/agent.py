@@ -1,10 +1,13 @@
+import asyncio
 import json
 import os
 from pathlib import Path
-from typing import Any
-import litellm
+from typing import Any, AsyncGenerator, Callable
+
+from litellm import stream_chunk_builder
 
 from cleankoda.commands import CommandContext, registry
+from cleankoda.llm import format_tool_call_display, stream_llm_completion
 from cleankoda.memory import Memory
 from cleankoda.sandbox import SandboxManager
 from cleankoda.session_state import SessionState, StatusManager
@@ -16,48 +19,108 @@ Use your tools to complete the user's task, then briefly summarize what you did.
 The working directory is the folder the user launched you from."""
 
 
-def run_agent(
+async def run_agent(
     memory: Memory,
-    state: SessionState | None = None,
+    state: SessionState,
+    tools: list[dict[str, Any]] | None = TOOL_SCHEMAS,
+    status_callback: Callable[[str | None], None] | None = None,
     status_manager: StatusManager | None = None,
-) -> str | None:
-    if state is None:
-        state = SessionState.load()
+    cancel_event: asyncio.Event | None = None,
+    max_tool_iterations: int = 10,
+) -> AsyncGenerator[str, None]:
+    """Central agent loop orchestrator.
+    Iteratively calls LLM service, streams responses, executes tools, and records assistant and tool messages in memory.
+    """
+    iteration = 0
 
-    litellm.suppress_debug_info = True
-    model_identifier = state.litellm_model_identifier
-    api_key = state.get_active_api_key()
+    while iteration < max_tool_iterations:
+        if cancel_event is not None and cancel_event.is_set():
+            yield "[yellow]Agent execution cancelled.[/yellow]\n"
+            return
 
-    while True:
-        kwargs: dict[str, Any] = {
-            "model": model_identifier,
-            "messages": memory.messages,
-            "tools": TOOL_SCHEMAS,
-            "temperature": state.temperature,
-            "max_tokens": state.max_tokens,
-        }
-        if api_key:
-            kwargs["api_key"] = api_key
+        iteration += 1
+        chunks: list[Any] = []
 
-        response = litellm.completion(**kwargs)
-        message = response.choices[0].message
-        memory.add_message(message)
+        async for chunk in stream_llm_completion(
+            messages=memory,
+            state=state,
+            tools=tools,
+            cancel_event=cancel_event,
+            status_callback=status_callback,
+            status_manager=status_manager,
+            chunks_out=chunks,
+        ):
+            yield chunk
 
-        tool_calls = getattr(message, "tool_calls", None)
+        if cancel_event is not None and cancel_event.is_set():
+            return
+
+        if not chunks:
+            break
+
+        # Reconstruct response message to inspect tool calls
+        try:
+            stream_response_obj = stream_chunk_builder(chunks)
+            response_msg = stream_response_obj.choices[0].message
+        except Exception:
+            break
+
+        tool_calls = getattr(response_msg, "tool_calls", None)
         if not tool_calls:
-            return message.content
+            content_text = getattr(response_msg, "content", None)
+            if content_text:
+                last_msg = memory.messages[-1] if memory.messages else None
+                last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
+                if last_role != "assistant":
+                    memory.add_assistant(content_text)
+            break
 
+        # Save assistant message with tool calls as a clean dictionary in memory
+        if hasattr(response_msg, "model_dump"):
+            response_msg_dict = response_msg.model_dump(exclude_none=True)
+        elif hasattr(response_msg, "dict"):
+            response_msg_dict = response_msg.dict(exclude_none=True)
+        elif isinstance(response_msg, dict):
+            response_msg_dict = response_msg
+        else:
+            response_msg_dict = {"role": "assistant"}
+
+        if isinstance(response_msg_dict, dict):
+            response_msg_dict["role"] = "assistant"
+
+        memory.add_message(response_msg_dict)
+
+        # Execute tool calls
         for tool_call in tool_calls:
+            if cancel_event is not None and cancel_event.is_set():
+                yield "[yellow]Tool execution cancelled.[/yellow]\n"
+                return
+
             func = getattr(tool_call, "function", None)
-            tool_name = getattr(func, "name", "unknown") if func else "unknown"
+            func_name = getattr(func, "name", "unknown") if func else "unknown"
+            func_args = getattr(func, "arguments", "") if func else ""
+            tool_call_id = getattr(tool_call, "id", "") or f"call_{func_name}"
+
+            display_str = format_tool_call_display(func_name, func_args)
+            yield f"{display_str}\n"
+
+            tool_status_msg = f"Execute tool: {func_name}..."
             if status_manager:
-                status_manager.set("tool", f"Execute tool: {tool_name}...")
+                status_manager.set("tool", tool_status_msg)
+            if status_callback:
+                status_callback(tool_status_msg)
+
             try:
-                result = run_tool(tool_call)
+                tool_result = await run_tool(tool_call)
             finally:
                 if status_manager:
                     status_manager.clear("tool")
-            tool_call_id = getattr(tool_call, "id", None)
-            if not tool_call_id and isinstance(tool_call, dict):
-                tool_call_id = tool_call.get("id")
-            memory.add_tool_message(tool_call_id=tool_call_id or "", content=result)
+                if status_callback:
+                    status_callback(None)
+
+            tool_msg = {
+                "role": "tool",
+                "tool_call_id": tool_call_id,
+                "content": tool_result,
+            }
+            memory.add_message(tool_msg)

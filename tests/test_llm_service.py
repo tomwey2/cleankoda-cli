@@ -9,13 +9,14 @@ from litellm.exceptions import (
     RateLimitError,
 )
 
-from cleankoda.llm import stream_chat_response
+from cleankoda.agent import run_agent
+from cleankoda.llm import stream_llm_completion
 from cleankoda.session_state import SessionState
 
 
 class TestLLMService(unittest.TestCase):
 
-    def test_stream_chat_response_success(self):
+    def test_stream_llm_completion_success(self):
         async def _test():
             state = SessionState(provider="openai", model="gpt-4o")
             messages = [{"role": "user", "content": "Hello"}]
@@ -36,14 +37,14 @@ class TestLLMService(unittest.TestCase):
                 SessionState, "get_active_api_key", return_value="test-key"
             ):
                 chunks = []
-                async for token in stream_chat_response(messages, state):
+                async for token in stream_llm_completion(messages, state):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Hello world!")
 
         asyncio.run(_test())
 
-    def test_stream_chat_response_ollama_no_api_key(self):
+    def test_stream_llm_completion_ollama_no_api_key(self):
         async def _test():
             state = SessionState(provider="ollama", model="llama3.3")
             messages = [{"role": "user", "content": "Hello"}]
@@ -58,14 +59,14 @@ class TestLLMService(unittest.TestCase):
 
             with patch("litellm.acompletion", side_effect=mock_acompletion):
                 chunks = []
-                async for token in stream_chat_response(messages, state):
+                async for token in stream_llm_completion(messages, state):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Ollama response")
 
         asyncio.run(_test())
 
-    def test_stream_chat_response_auth_error(self):
+    def test_stream_llm_completion_auth_error(self):
         async def _test():
             state = SessionState(provider="anthropic", model="claude-3-5-sonnet-latest")
             messages = [{"role": "user", "content": "Hello"}]
@@ -79,7 +80,7 @@ class TestLLMService(unittest.TestCase):
 
             with patch("litellm.acompletion", side_effect=auth_err):
                 chunks = []
-                async for token in stream_chat_response(messages, state):
+                async for token in stream_llm_completion(messages, state):
                     chunks.append(token)
 
                 result = "".join(chunks)
@@ -87,7 +88,7 @@ class TestLLMService(unittest.TestCase):
 
         asyncio.run(_test())
 
-    def test_stream_chat_response_tool_execution(self):
+    def test_run_agent_tool_execution(self):
         async def _test():
             import tempfile
             from pathlib import Path
@@ -143,10 +144,10 @@ class TestLLMService(unittest.TestCase):
                     yield chunk_text_2
 
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
-                "cleankoda.llm.service.run_tool", return_value="file1.txt\nfile2.txt"
+                "cleankoda.agent.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
-                async for token in stream_chat_response(mem, state):
+                async for token in run_agent(mem, state):
                     chunks.append(token)
 
                 output = "".join(chunks)

@@ -1,0 +1,148 @@
+import asyncio
+import tempfile
+import unittest
+from pathlib import Path
+from unittest.mock import MagicMock, patch
+
+from cleankoda.agent import run_agent
+from cleankoda.memory import Memory
+from cleankoda.session_state import SessionState, StatusManager
+
+
+class TestAgentLoop(unittest.TestCase):
+
+    def test_run_agent_basic_completion(self):
+        async def _test():
+            state = SessionState(provider="openai", model="gpt-4o")
+            mem = Memory(system_prompt="Test")
+            mem.add_user("Hello agent")
+
+            async def mock_stream_llm(messages, state, **kwargs):
+                chunks_out = kwargs.get("chunks_out")
+                if chunks_out is not None:
+                    chunks_out.append({
+                        "id": "1",
+                        "object": "chat.completion.chunk",
+                        "created": 12345,
+                        "model": "gpt-4o",
+                        "choices": [{
+                            "index": 0,
+                            "delta": {"role": "assistant", "content": "Hello user!"},
+                            "finish_reason": "stop"
+                        }]
+                    })
+                yield "Hello user!"
+
+            with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm):
+                tokens = []
+                async for token in run_agent(mem, state):
+                    tokens.append(token)
+
+            self.assertEqual("".join(tokens), "Hello user!")
+            self.assertEqual(mem.messages[-1]["role"], "assistant")
+            self.assertEqual(mem.messages[-1]["content"], "Hello user!")
+
+        asyncio.run(_test())
+
+    def test_run_agent_custom_tools_and_cancellation(self):
+        async def _test():
+            state = SessionState(provider="openai", model="gpt-4o")
+            mem = Memory(system_prompt="Test")
+            cancel_event = asyncio.Event()
+
+            async def mock_stream_llm(messages, state, **kwargs):
+                self.assertEqual(kwargs.get("tools"), [{"type": "function", "function": {"name": "custom_tool"}}])
+                yield "Running tool..."
+
+            cancel_event.set()
+
+            with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm):
+                tokens = []
+                async for token in run_agent(
+                    mem,
+                    state,
+                    tools=[{"type": "function", "function": {"name": "custom_tool"}}],
+                    cancel_event=cancel_event,
+                ):
+                    tokens.append(token)
+
+            self.assertIn("Agent execution cancelled.", "".join(tokens))
+
+        asyncio.run(_test())
+
+    def test_run_agent_status_callback_invocation(self):
+        async def _test():
+            state = SessionState(provider="openai", model="gpt-4o")
+            mem = Memory(system_prompt="Test")
+            statuses = []
+
+            def status_cb(st):
+                statuses.append(st)
+
+            tool_chunk = {
+                "id": "1",
+                "object": "chat.completion.chunk",
+                "created": 12345,
+                "model": "gpt-4o",
+                "choices": [{
+                    "index": 0,
+                    "delta": {
+                        "role": "assistant",
+                        "tool_calls": [{
+                            "index": 0,
+                            "id": "call_123",
+                            "type": "function",
+                            "function": {"name": "list_files", "arguments": "{}"}
+                        }]
+                    },
+                    "finish_reason": "tool_calls"
+                }]
+            }
+
+            text_chunk = {
+                "id": "2",
+                "object": "chat.completion.chunk",
+                "created": 12345,
+                "model": "gpt-4o",
+                "choices": [{
+                    "index": 0,
+                    "delta": {"role": "assistant", "content": "Done."},
+                    "finish_reason": "stop"
+                }]
+            }
+
+            call_count = 0
+
+            async def mock_stream_llm(messages, state, **kwargs):
+                nonlocal call_count
+                call_count += 1
+                chunks_out = kwargs.get("chunks_out")
+                if call_count == 1:
+                    if chunks_out is not None:
+                        chunks_out.append(tool_chunk)
+                else:
+                    if chunks_out is not None:
+                        chunks_out.append(text_chunk)
+                    yield "Done."
+
+            with patch("cleankoda.agent.stream_llm_completion", side_effect=mock_stream_llm), patch(
+                "cleankoda.agent.run_tool", return_value="file1.txt"
+            ):
+                tokens = []
+                async for token in run_agent(
+                    mem,
+                    state,
+                    status_callback=status_cb,
+                ):
+                    tokens.append(token)
+
+                output = "".join(tokens)
+                self.assertIn("list_files", output)
+                self.assertIn("Done.", output)
+                self.assertTrue(any("Execute tool: list_files" in s for s in statuses if s))
+
+        asyncio.run(_test())
+
+
+if __name__ == "__main__":
+    unittest.main()
