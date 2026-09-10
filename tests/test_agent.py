@@ -7,33 +7,26 @@ from unittest.mock import MagicMock, patch
 from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.statusline import SessionState, StatusLine
+from cleankoda.statusline import statusline
 from cleankoda.tools import TOOL_SCHEMAS
 
 
 class TestAgentLoop(unittest.TestCase):
 
     def test_agent_class_instantiation(self):
-        state = SessionState(provider="openai", model="gpt-4o")
         mem = Memory(system_prompt="Test")
-        ls = LLMService(state=state)
-        status_mgr = StatusLine()
+        ls = LLMService()
         agent = Agent(
             memory=mem,
             llm_service=ls,
             tools=TOOL_SCHEMAS,
-            state=state,
-            status_manager=status_mgr,
         )
         self.assertEqual(agent.memory, mem)
         self.assertEqual(agent.llm_service, ls)
         self.assertEqual(agent.tools, TOOL_SCHEMAS)
-        self.assertEqual(agent.state, state)
-        self.assertEqual(agent.status_manager, status_mgr)
 
     def test_run_agent_basic_completion(self):
         async def _test():
-            state = SessionState(provider="openai", model="gpt-4o")
             mem = Memory(system_prompt="Test")
             mem.add_user("Hello agent")
 
@@ -55,7 +48,7 @@ class TestAgentLoop(unittest.TestCase):
 
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
-                agent = Agent(memory=mem, llm_service=LLMService(state=state), tools=TOOL_SCHEMAS, state=state)
+                agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS)
                 async for token in agent.run():
                     tokens.append(token)
 
@@ -67,7 +60,6 @@ class TestAgentLoop(unittest.TestCase):
 
     def test_run_agent_custom_tools_and_cancellation(self):
         async def _test():
-            state = SessionState(provider="openai", model="gpt-4o")
             mem = Memory(system_prompt="Test")
             cancel_event = asyncio.Event()
 
@@ -81,9 +73,8 @@ class TestAgentLoop(unittest.TestCase):
                 tokens = []
                 agent = Agent(
                     memory=mem,
-                    llm_service=LLMService(state=state),
+                    llm_service=LLMService(),
                     tools=[{"type": "function", "function": {"name": "custom_tool"}}],
-                    state=state,
                 )
                 async for token in agent.run(cancel_event=cancel_event):
                     tokens.append(token)
@@ -94,11 +85,10 @@ class TestAgentLoop(unittest.TestCase):
 
     def test_run_agent_status_callback_invocation(self):
         async def _test():
-            state = SessionState(provider="openai", model="gpt-4o")
             mem = Memory(system_prompt="Test")
             statuses = []
 
-            def status_cb(st):
+            def status_cb(st=""):
                 statuses.append(st)
 
             tool_chunk = {
@@ -147,26 +137,26 @@ class TestAgentLoop(unittest.TestCase):
                         chunks_out.append(text_chunk)
                     yield "Done."
 
-            status_mgr = StatusLine(on_change=status_cb)
+            statusline.on_change = status_cb
+            try:
+                with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm), patch(
+                    "cleankoda.agent.run_tool", return_value="file1.txt"
+                ):
+                    tokens = []
+                    agent = Agent(
+                        memory=mem,
+                        llm_service=LLMService(),
+                        tools=TOOL_SCHEMAS,
+                    )
+                    async for token in agent.run():
+                        tokens.append(token)
 
-            with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm), patch(
-                "cleankoda.agent.run_tool", return_value="file1.txt"
-            ):
-                tokens = []
-                agent = Agent(
-                    memory=mem,
-                    llm_service=LLMService(state=state, status_manager=status_mgr),
-                    tools=TOOL_SCHEMAS,
-                    state=state,
-                    status_manager=status_mgr,
-                )
-                async for token in agent.run():
-                    tokens.append(token)
-
-                output = "".join(tokens)
-                self.assertIn("list_files", output)
-                self.assertIn("Done.", output)
-                self.assertTrue(any("Execute tool: list_files" in s for s in statuses if s))
+                    output = "".join(tokens)
+                    self.assertIn("list_files", output)
+                    self.assertIn("Done.", output)
+                    self.assertTrue(any("Execute tool: list_files" in s for s in statuses if s))
+            finally:
+                statusline.on_change = None
 
         asyncio.run(_test())
 

@@ -10,15 +10,14 @@ from litellm.exceptions import (
 )
 
 from cleankoda.agent import Agent
+from cleankoda.config import AppConfig, config
 from cleankoda.llm import LLMService
-from cleankoda.statusline import SessionState
 
 
 class TestLLMService(unittest.TestCase):
 
     def test_stream_llm_completion_success(self):
         async def _test():
-            state = SessionState(provider="openai", model="gpt-4o")
             messages = [{"role": "user", "content": "Hello"}]
 
             mock_chunk1 = {"choices": [{"delta": {"content": "Hello"}}]}
@@ -32,10 +31,12 @@ class TestLLMService(unittest.TestCase):
                     yield chunk
 
             with patch("litellm.acompletion", side_effect=mock_acompletion), patch.object(
-                SessionState, "get_active_api_key", return_value="test-key"
+                config, "provider", "openai"
+            ), patch.object(config, "model", "gpt-4o"), patch.object(
+                AppConfig, "get_active_api_key", return_value="test-key"
             ):
                 chunks = []
-                async for token in LLMService(state=state).stream_completion(messages, tools=[]):
+                async for token in LLMService().stream_completion(messages, tools=[]):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Hello world!")
@@ -44,7 +45,6 @@ class TestLLMService(unittest.TestCase):
 
     def test_stream_llm_completion_ollama_no_api_key(self):
         async def _test():
-            state = SessionState(provider="ollama", model="llama3.3")
             messages = [{"role": "user", "content": "Hello"}]
 
             async def mock_acompletion(*args, **kwargs):
@@ -54,9 +54,11 @@ class TestLLMService(unittest.TestCase):
                 mock_chunk = {"choices": [{"delta": {"content": "Ollama response"}}]}
                 yield mock_chunk
 
-            with patch("litellm.acompletion", side_effect=mock_acompletion):
+            with patch("litellm.acompletion", side_effect=mock_acompletion), patch.object(
+                config, "provider", "ollama"
+            ), patch.object(config, "model", "llama3.3"):
                 chunks = []
-                async for token in LLMService(state=state).stream_completion(messages, tools=[]):
+                async for token in LLMService().stream_completion(messages, tools=[]):
                     chunks.append(token)
 
                 self.assertEqual("".join(chunks), "Ollama response")
@@ -65,7 +67,6 @@ class TestLLMService(unittest.TestCase):
 
     def test_stream_llm_completion_auth_error(self):
         async def _test():
-            state = SessionState(provider="anthropic", model="claude-3-5-sonnet-latest")
             messages = [{"role": "user", "content": "Hello"}]
 
             auth_err = AuthenticationError(
@@ -75,9 +76,11 @@ class TestLLMService(unittest.TestCase):
                 model="claude-3-5-sonnet-latest",
             )
 
-            with patch("litellm.acompletion", side_effect=auth_err):
+            with patch("litellm.acompletion", side_effect=auth_err), patch.object(
+                config, "provider", "anthropic"
+            ), patch.object(config, "model", "claude-3-5-sonnet-latest"):
                 chunks = []
-                async for token in LLMService(state=state).stream_completion(messages, tools=[]):
+                async for token in LLMService().stream_completion(messages, tools=[]):
                     chunks.append(token)
 
                 result = "".join(chunks)
@@ -93,7 +96,6 @@ class TestLLMService(unittest.TestCase):
 
             with tempfile.TemporaryDirectory() as tmpdir:
                 file_path = Path(tmpdir) / "memory.json"
-                state = SessionState(provider="openai", model="gpt-4o")
                 mem = Memory(system_prompt="Test", file=file_path)
                 mem.add_user("List files")
 
@@ -147,7 +149,7 @@ class TestLLMService(unittest.TestCase):
                 "cleankoda.agent.run_tool", return_value="file1.txt\nfile2.txt"
             ) as mock_run_tool:
                 chunks = []
-                agent = Agent(memory=mem, llm_service=LLMService(state=state), tools=TOOL_SCHEMAS, state=state)
+                agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS)
                 async for token in agent.run():
                     chunks.append(token)
 
@@ -163,7 +165,7 @@ class TestLLMService(unittest.TestCase):
     def test_llm_service_class_instance_methods(self):
         from cleankoda.llm import LLMService
 
-        service = LLMService(state=SessionState(provider="openai", model="gpt-4o"))
+        service = LLMService()
         self.assertEqual(service.format_tool_call_display("read_file", '{"path": "test.py"}'), "read_file(test.py)")
         err = APIConnectionError(message="OpenAIException - Loading model", llm_provider="custom", model="qwen")
         self.assertTrue(service.is_cold_start_error(err))

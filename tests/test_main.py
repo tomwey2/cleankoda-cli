@@ -7,7 +7,6 @@ from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.main import main, run_headless
 from cleankoda.memory import Memory
-from cleankoda.statusline import SessionState
 from cleankoda.tools import TOOL_SCHEMAS
 
 
@@ -19,12 +18,10 @@ class TestMainDualMode(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
-            state = SessionState.load()
             agent = Agent(
                 memory=mem,
-                llm_service=LLMService(state=state),
+                llm_service=LLMService(),
                 tools=TOOL_SCHEMAS,
-                state=state,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -45,12 +42,10 @@ class TestMainDualMode(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
-            state = SessionState.load()
             agent = Agent(
                 memory=mem,
-                llm_service=LLMService(state=state),
+                llm_service=LLMService(),
                 tools=TOOL_SCHEMAS,
-                state=state,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -90,7 +85,8 @@ class TestMainDualMode(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
-            tui = TUI(mem)
+            agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+            tui = TUI(agent)
             tui.update_status_line()
             lines = tui.status_line.text.splitlines()
             self.assertGreaterEqual(len(lines), 2)

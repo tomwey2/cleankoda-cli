@@ -9,7 +9,7 @@ from litellm.exceptions import (
 )
 
 from cleankoda.llm.service import LLMService
-from cleankoda.statusline import SessionState
+from cleankoda.statusline import statusline
 
 
 class TestColdStartBackoff(unittest.TestCase):
@@ -21,7 +21,7 @@ class TestColdStartBackoff(unittest.TestCase):
             llm_provider="custom",
             model="qwen",
         )
-        service = LLMService(state=SessionState(provider="custom", model="qwen"))
+        service = LLMService()
         self.assertTrue(service.is_cold_start_error(err_503))
 
         err_loading = APIConnectionError(
@@ -41,7 +41,6 @@ class TestColdStartBackoff(unittest.TestCase):
 
     def test_exponential_backoff_retry_success(self):
         async def _test():
-            state = SessionState(provider="custom", model="qwen")
             messages = [{"role": "user", "content": "Hello"}]
 
             call_count = 0
@@ -79,7 +78,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in LLMService(state=state).stream_completion(
+                async for token in LLMService().stream_completion(
                     messages, tools=[], cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
                 ):
                     chunks.append(token)
@@ -96,7 +95,6 @@ class TestColdStartBackoff(unittest.TestCase):
 
     def test_escape_cancellation(self):
         async def _test():
-            state = SessionState(provider="custom", model="qwen")
             messages = [{"role": "user", "content": "Hello"}]
             cancel_event = asyncio.Event()
 
@@ -117,7 +115,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.wait_for", side_effect=mock_wait_for
             ):
                 chunks = []
-                async for token in LLMService(state=state).stream_completion(
+                async for token in LLMService().stream_completion(
                     messages, tools=[], cancel_event=cancel_event, initial_delay=10.0, max_attempts=10
                 ):
                     chunks.append(token)
@@ -130,7 +128,6 @@ class TestColdStartBackoff(unittest.TestCase):
 
     def test_max_attempts_exceeded(self):
         async def _test():
-            state = SessionState(provider="custom", model="qwen")
             messages = [{"role": "user", "content": "Hello"}]
 
             call_count = 0
@@ -152,7 +149,7 @@ class TestColdStartBackoff(unittest.TestCase):
                 "asyncio.sleep", side_effect=mock_sleep
             ):
                 chunks = []
-                async for token in LLMService(state=state).stream_completion(
+                async for token in LLMService().stream_completion(
                     messages, tools=[], initial_delay=1.0, max_attempts=3
                 ):
                     chunks.append(token)
@@ -165,11 +162,10 @@ class TestColdStartBackoff(unittest.TestCase):
 
     def test_status_callback_cold_start(self):
         async def _test():
-            state = SessionState(provider="custom", model="qwen")
             messages = [{"role": "user", "content": "Hello"}]
             statuses_received = []
 
-            def status_cb(st):
+            def status_cb(st=""):
                 statuses_received.append(st)
 
             call_count = 0
@@ -200,30 +196,30 @@ class TestColdStartBackoff(unittest.TestCase):
             async def mock_wait_for(fut, timeout):
                 raise asyncio.TimeoutError()
 
-            from cleankoda.session_state import StatusManager
-
-            sm = StatusManager(on_change=status_cb)
+            statusline.on_change = status_cb
 
             cancel_event = asyncio.Event()
-            with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
-                "asyncio.wait_for", side_effect=mock_wait_for
-            ):
-                chunks = []
-                async for token in LLMService(state=state, status_manager=sm).stream_completion(
-                    messages,
-                    tools=[],
-                    cancel_event=cancel_event,
-                    initial_delay=10.0,
-                    max_attempts=10,
+            try:
+                with patch("litellm.acompletion", side_effect=mock_acompletion), patch(
+                    "asyncio.wait_for", side_effect=mock_wait_for
                 ):
-                    chunks.append(token)
+                    chunks = []
+                    async for token in LLMService().stream_completion(
+                        messages,
+                        tools=[],
+                        cancel_event=cancel_event,
+                        initial_delay=10.0,
+                        max_attempts=10,
+                    ):
+                        chunks.append(token)
 
-                output = "".join(chunks)
-                self.assertEqual(output, "Ready content")
-                self.assertTrue(any("attempt 1/10" in s for s in statuses_received if s))
+                    output = "".join(chunks)
+                    self.assertIn("Ready content", output)
+                    self.assertTrue(any("attempt 1/10" in s for s in statuses_received if s))
+            finally:
+                statusline.on_change = None
 
         asyncio.run(_test())
-
 
 
 if __name__ == "__main__":

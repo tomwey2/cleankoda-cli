@@ -9,7 +9,7 @@ from prompt_toolkit.layout.containers import FloatContainer, Window
 from prompt_toolkit.layout.layout import Layout
 
 from cleankoda.commands import CommandContext, registry
-from cleankoda.config import get_provider
+from cleankoda.config import AppConfig
 from cleankoda.llm import CredentialsStore
 from cleankoda.memory import Memory
 
@@ -34,7 +34,7 @@ class TestProviderCommand(unittest.TestCase):
             ):
                 res = registry.dispatch("/provider ollama", ctx)
                 self.assertIn("Provider switched to: ollama", res.output)
-                self.assertEqual(get_provider(), "ollama")
+                self.assertEqual(AppConfig.load(file_path=config_file).provider, "ollama")
                 mock_prompt_key.assert_not_called()
 
     @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
@@ -52,8 +52,8 @@ class TestProviderCommand(unittest.TestCase):
             ), patch("cleankoda.llm.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider openai", ctx)
                 self.assertIn("API key updated. Provider switched to: openai", res.output)
-                self.assertEqual(get_provider(), "openai")
-                self.assertEqual(CredentialsStore.load(file_path=cred_file).get_stored_key("openai"), "sk-new-openai-key")
+                self.assertEqual(AppConfig.load(file_path=config_file).provider, "openai")
+                self.assertEqual(CredentialsStore.load(file_path=cred_file).get_key("openai"), "sk-new-openai-key")
 
     def test_provider_direct_argument_invalid(self):
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -68,7 +68,7 @@ class TestProviderCommand(unittest.TestCase):
                 res = registry.dispatch("/provider unknown_llm", ctx)
                 self.assertIn("Invalid provider 'unknown_llm'", res.output)
                 self.assertIn("Available providers:", res.output)
-                self.assertIsNone(get_provider())
+                self.assertFalse(config_file.exists())
 
     @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
     @patch("cleankoda.commands.provider.select_provider_interactive", new_callable=AsyncMock)
@@ -88,7 +88,7 @@ class TestProviderCommand(unittest.TestCase):
             ), patch("cleankoda.llm.credentials.DEFAULT_CREDENTIALS_FILE", cred_file):
                 res = registry.dispatch("/provider", ctx)
                 self.assertIn("API key updated. Provider switched to: anthropic", res.output)
-                self.assertEqual(get_provider(), "anthropic")
+                self.assertEqual(AppConfig.load(file_path=config_file).provider, "anthropic")
                 mock_select.assert_called_once()
                 mock_prompt_key.assert_called_once()
 
@@ -106,7 +106,7 @@ class TestProviderCommand(unittest.TestCase):
             ):
                 res = registry.dispatch("/provider", ctx)
                 self.assertIn("Provider selection cancelled.", res.output)
-                self.assertIsNone(get_provider())
+                self.assertFalse(config_file.exists())
                 mock_select.assert_called_once()
 
     def test_show_tui_modal_provider_dialog(self):

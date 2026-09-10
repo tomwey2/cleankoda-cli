@@ -2,8 +2,9 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 
 class StatusLine:
-    _slots: dict[str, str] = {}
-    on_change: Callable[[str], None] | Callable[[], None] | None = None
+    def __init__(self, on_change: Callable[[str], None] | Callable[[], None] | None = None) -> None:
+        self._slots: dict[str, str] = {}
+        self.on_change = on_change
 
     def set(self, source: str, message: str) -> None:
         """Sets or updates the status of a source and notifies observers."""

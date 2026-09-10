@@ -104,9 +104,14 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
 
     def test_escape_clears_slash_command_prompt(self):
         from unittest.mock import MagicMock
-        memory = Memory(system_prompt="Test")
+        from cleankoda.agent import Agent
+        from cleankoda.llm import LLMService
+        from cleankoda.tools import TOOL_SCHEMAS
         from cleankoda.tui import TUI
-        tui = TUI(memory)
+
+        memory = Memory(system_prompt="Test")
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tui = TUI(agent)
         tui.input_field.text = "/model"
 
         # Trigger escape keybinding handler
@@ -116,9 +121,14 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
 
     def test_escape_preserves_regular_prompt(self):
         from unittest.mock import MagicMock
-        memory = Memory(system_prompt="Test")
+        from cleankoda.agent import Agent
+        from cleankoda.llm import LLMService
+        from cleankoda.tools import TOOL_SCHEMAS
         from cleankoda.tui import TUI
-        tui = TUI(memory)
+
+        memory = Memory(system_prompt="Test")
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tui = TUI(agent)
         tui.input_field.text = "Hello world"
 
         # Trigger escape keybinding handler
@@ -136,6 +146,9 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         from unittest.mock import MagicMock
         from prompt_toolkit.buffer import CompletionState
         from prompt_toolkit.completion import Completion
+        from cleankoda.agent import Agent
+        from cleankoda.llm import LLMService
+        from cleankoda.tools import TOOL_SCHEMAS
         from cleankoda.tui import TUI
 
         mock_app = MagicMock()
@@ -146,7 +159,8 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         mock_get_app.return_value = mock_app
 
         memory = Memory(system_prompt="Test")
-        tui = TUI(memory)
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tui = TUI(agent)
         tui.input_field.text = "/m"
         tui.input_field.buffer.cursor_position = 2
 
@@ -169,33 +183,42 @@ class TestTUIStatusManager(unittest.TestCase):
 
     def test_status_manager_updates_status_line(self):
         from unittest.mock import MagicMock
+        from cleankoda.agent import Agent
+        from cleankoda.llm import LLMService
         from cleankoda.memory import Memory
+        from cleankoda.statusline import statusline
+        from cleankoda.tools import TOOL_SCHEMAS
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        tui = TUI(memory)
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tui = TUI(agent)
+        statusline.on_change = tui.on_status_changed
         mock_app = MagicMock()
         tui.app = mock_app
 
         # Initially default status line text
         self.assertIn("Ctrl+O for shortcuts", tui.status_line.text)
 
-        # Setting status via status_manager automatically updates status line
-        tui.status_manager.set("sandbox", "Sandbox: Startet (docker:latest)...")
-        self.assertIn("▶ Sandbox: Startet (docker:latest)...", tui.status_line.text)
-        mock_app.invalidate.assert_called()
+        # Setting status via statusline automatically updates status line
+        try:
+            statusline.set("sandbox", "Sandbox: Startet (docker:latest)...")
+            self.assertIn("▶ Sandbox: Startet (docker:latest)...", tui.status_line.text)
+            mock_app.invalidate.assert_called()
 
-        # Multiple slots are combined
-        tui.status_manager.set("llm", "LLM Cold Start: Versuch 1/10 (10s gewartet)")
-        self.assertIn(
-            "▶ Sandbox: Startet (docker:latest)... | LLM Cold Start: Versuch 1/10 (10s gewartet)",
-            tui.status_line.text,
-        )
+            # Multiple slots are combined
+            statusline.set("llm", "LLM Cold Start: Versuch 1/10 (10s gewartet)")
+            self.assertIn(
+                "▶ Sandbox: Startet (docker:latest)... | LLM Cold Start: Versuch 1/10 (10s gewartet)",
+                tui.status_line.text,
+            )
 
-        # Clearing slots reverts back to Ctrl+O for shortcuts when empty
-        tui.status_manager.clear("sandbox")
-        tui.status_manager.clear("llm")
-        self.assertIn("Ctrl+O for shortcuts", tui.status_line.text)
+            # Clearing slots reverts back to Ctrl+O for shortcuts when empty
+            statusline.clear("sandbox")
+            statusline.clear("llm")
+            self.assertIn("Ctrl+O for shortcuts", tui.status_line.text)
+        finally:
+            statusline.on_change = None
 
 
 if __name__ == "__main__":

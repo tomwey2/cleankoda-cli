@@ -9,7 +9,7 @@ from prompt_toolkit.layout.containers import FloatContainer, Window
 from prompt_toolkit.layout.layout import Layout
 
 from cleankoda.commands import CommandContext, registry
-from cleankoda.config import get_model, set_provider
+from cleankoda.config import AppConfig
 from cleankoda.memory import Memory
 
 
@@ -32,7 +32,7 @@ class TestModelCommand(unittest.TestCase):
             ):
                 res = registry.dispatch("/model gpt-4o", ctx)
                 self.assertIn("Model switched to: gpt-4o", res.output)
-                self.assertEqual(get_model(), "gpt-4o")
+                self.assertEqual(AppConfig.load(file_path=config_file).model, "gpt-4o")
 
     @patch("cleankoda.commands.model.select_model_interactive", new_callable=AsyncMock)
     def test_model_interactive_selection(self, mock_select):
@@ -48,7 +48,7 @@ class TestModelCommand(unittest.TestCase):
             ):
                 res = registry.dispatch("/model", ctx)
                 self.assertIn("Model switched to: claude-3-5-sonnet-latest", res.output)
-                self.assertEqual(get_model(), "claude-3-5-sonnet-latest")
+                self.assertEqual(AppConfig.load(file_path=config_file).model, "claude-3-5-sonnet-latest")
                 mock_select.assert_called_once()
 
     @patch("cleankoda.commands.model.select_model_interactive", new_callable=AsyncMock)

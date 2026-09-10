@@ -41,23 +41,26 @@ class AppConfig(BaseModel):
         return f"openai/{model_str}"
 
     @classmethod
-    def load(cls, file_path: Path = CONFIG_FILE) -> "AppConfig":
+    def load(cls, file_path: Path | None = None) -> "AppConfig":
         """Loads the configuration from the JSON file or creates a new one with defaults."""
-        if file_path.is_file():
-            content = file_path.read_text(encoding="utf-8")
+        target_path = file_path or CONFIG_FILE
+        if target_path.is_file():
+            content = target_path.read_text(encoding="utf-8")
             return cls.model_validate_json(content)
 
         # If the file does not yet exist: create and save the default object.
         instance = cls()
-        instance.save(file_path)
+        instance.save(target_path)
         return instance
 
-    def save(self, file_path: Path = CONFIG_FILE) -> None:
+    def save(self, file_path: Path | None = None) -> None:
         """Saves the current state back to the JSON file in a formatted manner."""
+        target_path = file_path or CONFIG_FILE
+        target_path.parent.mkdir(parents=True, exist_ok=True)
         json_str = self.model_dump_json(indent=2)
-        file_path.write_text(json_str, encoding="utf-8")
+        target_path.write_text(json_str, encoding="utf-8")
         try:
-            os.chmod(file_path, 0o600)
+            os.chmod(target_path, 0o600)
         except OSError:
             pass
 

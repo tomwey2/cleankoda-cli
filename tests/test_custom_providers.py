@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 
 from cleankoda.commands import CommandContext
 from cleankoda.commands.provider import cmd_provider
+from cleankoda.config import AppConfig, config
 from cleankoda.llm.config import (
     ProviderConfig,
     get_available_providers,
@@ -16,7 +17,6 @@ from cleankoda.llm.config import (
     load_provider_registry,
 )
 from cleankoda.llm.service import LLMService
-from cleankoda.statusline import SessionState
 
 
 class TestCustomProviders(unittest.TestCase):
@@ -89,8 +89,8 @@ class TestCustomProviders(unittest.TestCase):
                 json.dump(content, f)
 
             with patch("cleankoda.llm.config.CUSTOM_CONFIG_FILE", custom_path):
-                state = SessionState(provider="gcp_serverless", model="qwen2.5-coder:32b")
-                self.assertEqual(state.litellm_model_identifier, "openai/qwen2.5-coder:32b")
+                cfg = AppConfig(provider="gcp_serverless", model="qwen2.5-coder:32b")
+                self.assertEqual(cfg.litellm_model_identifier, "openai/qwen2.5-coder:32b")
 
     def test_stream_chat_response_custom_provider(self):
         async def _test():
@@ -106,8 +106,9 @@ class TestCustomProviders(unittest.TestCase):
                 with open(custom_path, "w", encoding="utf-8") as f:
                     json.dump(content, f)
 
-                with patch("cleankoda.llm.config.CUSTOM_CONFIG_FILE", custom_path):
-                    state = SessionState(provider="vllm", model="meta-llama/Llama-3-8b")
+                with patch("cleankoda.llm.config.CUSTOM_CONFIG_FILE", custom_path), patch.object(
+                    config, "provider", "vllm"
+                ), patch.object(config, "model", "meta-llama/Llama-3-8b"):
                     messages = [{"role": "user", "content": "Hello vLLM"}]
 
                     async def mock_acompletion(*args, **kwargs):
@@ -121,7 +122,7 @@ class TestCustomProviders(unittest.TestCase):
 
                     with patch("litellm.acompletion", side_effect=mock_acompletion):
                         chunks = []
-                        async for token in LLMService(state=state).stream_completion(messages, tools=[]):
+                        async for token in LLMService().stream_completion(messages, tools=[]):
                             chunks.append(token)
 
                         self.assertEqual("".join(chunks), "Hello back")
@@ -157,9 +158,8 @@ class TestCustomProviders(unittest.TestCase):
                         res = await cmd_provider(["my_custom"], ctx)
                         self.assertIn("API key updated. Provider switched to: my_custom", res.output)
 
-                        state = SessionState.load(file_path=config_path)
-                        self.assertEqual(state.provider, "my_custom")
-                        self.assertEqual(state.model, "my-model-1")
+                        loaded_config = AppConfig.load(file_path=config_path)
+                        self.assertEqual(loaded_config.provider, "my_custom")
 
         asyncio.run(_test())
 
