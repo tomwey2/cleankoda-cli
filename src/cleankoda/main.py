@@ -13,8 +13,7 @@ from cleankoda.tui import run_tui
 from cleankoda.config import config
 
 
-def set_workspace() -> None:
-    workspace = Path.cwd()
+def set_workspace(workspace: Path) -> None:
     if workspace != config.workspace:
         config.workspace = workspace
         config.save()
@@ -70,6 +69,7 @@ def main(argv: list[str] | None = None) -> None:
     mode_group.add_argument("--headless", action="store_true", help="Force headless mode")
     parser.add_argument("prompt_pos", nargs="*", help="Optionaler Prompt (Headless)")
     parser.add_argument("-p", "--prompt", help="Prompt für den Headless-Modus")
+    parser.add_argument("-ws", "--workspace", type=Path, help="Set workspace directory")
 
     args = parser.parse_args(argv)
 
@@ -89,7 +89,15 @@ def main(argv: list[str] | None = None) -> None:
     else:
         final_prompt = prompt or piped_input
 
-    set_workspace()
+    if args.workspace:
+        ws_path = args.workspace.expanduser().resolve()
+        if not ws_path.exists():
+            print(f"Error: Workspace directory '{args.workspace}' does not exist.", file=sys.stderr)
+            sys.exit(1)
+        set_workspace(ws_path)
+    else:
+        set_workspace(Path.cwd())
+
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
     llm_service = LLMService()
 

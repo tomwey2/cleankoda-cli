@@ -95,6 +95,39 @@ class TestMainDualMode(unittest.TestCase):
             self.assertEqual(lines[1], "Ctrl+O for shortcuts")
             self.assertEqual(tui.status_line.window.height, 2)
 
+    @patch("cleankoda.main.run_tui")
+    @patch("cleankoda.main.set_workspace")
+    def test_main_workspace_valid(self, mock_set_workspace, mock_run_tui):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            main(["-ws", str(tmp_path), "--tui"])
+            mock_set_workspace.assert_called_once_with(tmp_path.resolve())
+
+    @patch("cleankoda.main.set_workspace")
+    def test_main_workspace_invalid(self, mock_set_workspace):
+        import tempfile
+        from pathlib import Path
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            non_existent = Path(tmpdir) / "does_not_exist"
+            with patch("sys.stderr", io.StringIO()) as mock_stderr:
+                with self.assertRaises(SystemExit) as cm:
+                    main(["--workspace", str(non_existent), "--tui"])
+                self.assertEqual(cm.exception.code, 1)
+                self.assertIn("does not exist", mock_stderr.getvalue())
+            mock_set_workspace.assert_not_called()
+
+    @patch("cleankoda.main.run_tui")
+    @patch("cleankoda.main.set_workspace")
+    def test_main_workspace_default(self, mock_set_workspace, mock_run_tui):
+        from pathlib import Path
+
+        main(["--tui"])
+        mock_set_workspace.assert_called_once_with(Path.cwd())
+
 
 if __name__ == "__main__":
     unittest.main()
