@@ -9,7 +9,7 @@ from litellm.exceptions import (
 )
 
 from cleankoda.llm.service import LLMService
-from cleankoda.session_state import SessionState
+from cleankoda.statusline import SessionState
 
 
 class TestColdStartBackoff(unittest.TestCase):

@@ -7,7 +7,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 from cleankoda.llm import CredentialsStore
-from cleankoda.session_state import SessionState
+from cleankoda.statusline import SessionState
 
 
 class TestSessionState(unittest.TestCase):

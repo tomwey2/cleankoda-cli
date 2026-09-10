@@ -12,11 +12,10 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
+from cleankoda.config import config
 from cleankoda.agent import Agent
 from cleankoda.commands import CommandContext, registry
-from cleankoda.llm import LLMService
-from cleankoda.memory import Memory
-from cleankoda.session_state import SessionState, StatusManager
+from cleankoda.statusline import StatusManager
 from cleankoda.tools import TOOL_SCHEMAS, get_sandbox_status, sandbox_manager
 
 
@@ -191,36 +190,12 @@ class TUI:
 
     def __init__(
         self,
-        agent: Agent | Memory,
-        status_manager: StatusManager | None = None,
-        llm_service: LLMService | None = None,
+        agent: Agent,
+        status_manager: StatusManager,
     ) -> None:
-        if isinstance(agent, Memory):
-            sm = status_manager or StatusManager()
-            state = SessionState.load()
-            ls = llm_service or LLMService(state=state, status_manager=sm)
-            self.agent = Agent(
-                memory=agent,
-                llm_service=ls,
-                tools=TOOL_SCHEMAS,
-                state=state,
-                status_manager=sm,
-            )
-        else:
-            self.agent = agent
-            if status_manager is not None:
-                self.agent.status_manager = status_manager
-            if llm_service is not None:
-                self.agent.llm_service = llm_service
-
-        if self.agent.status_manager is None:
-            self.agent.status_manager = StatusManager()
-        self.status_manager = self.agent.status_manager
+        self.agent = agent
+        self.status_manager = status_manager
         self.status_manager.on_change = self._on_status_changed
-        self.llm_service = self.agent.llm_service
-        if self.llm_service.status_manager is None:
-            self.llm_service.status_manager = self.status_manager
-        self.memory = self.agent.memory
         self.showing_shortcuts = False
         self.is_processing = False
         self._cancel_event: asyncio.Event | None = None
@@ -302,9 +277,8 @@ class TUI:
         return self._cancel_event
 
     def get_session_status_text(self) -> str:
-        state = SessionState.load()
         sb_status = get_sandbox_status()
-        return f"Provider: {state.provider} | Model: {state.model} | Temp: {state.temperature} | Sandbox: {sb_status}"
+        return f"Provider: {config.provider} | Model: {config.model} | Temp: {config.temperature} | Sandbox: {sb_status}"
 
     def update_status_line(self) -> None:
         session_text = self.get_session_status_text()
@@ -388,7 +362,7 @@ class TUI:
 
     async def stream_response(self, user_text: str) -> None:
         if user_text.startswith("/"):
-            ctx = CommandContext(memory=self.memory, app=self.app)
+            ctx = CommandContext(memory=self.agent.memory, app=self.app)
             result = await registry.dispatch_async(user_text, ctx)
             if result.output:
                 self.history_area.text += f"\n\n[System]: {result.output}\n"
@@ -404,11 +378,10 @@ class TUI:
         self.history_area.buffer.cursor_position = len(self.history_area.text)
         self.app.invalidate()
 
-        self.memory.add_user(user_text)
+        self.agent.memory.add_user(user_text)
 
         self.cancel_event.clear()
 
-        self.agent.state = SessionState.load()
         async for chunk in self.agent.run(
             cancel_event=self.cancel_event,
         ):
@@ -426,10 +399,9 @@ class TUI:
 
 
 def run_tui(
-    agent: Agent | Memory,
+    agent: Agent,
     status_manager: StatusManager | None = None,
-    llm_service: LLMService | None = None,
 ) -> None:
     """Start the interactive TUI application with the provided Agent instance."""
-    tui = TUI(agent, status_manager=status_manager, llm_service=llm_service)
+    tui = TUI(agent, status_manager=status_manager)
     tui.run()

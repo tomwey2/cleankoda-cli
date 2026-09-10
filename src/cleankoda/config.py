@@ -1,57 +1,70 @@
+import os
 from pathlib import Path
+from pydantic import BaseModel, Field
 
-from cleankoda.llm import get_models_for_provider as fetch_models_for_provider
-from cleankoda.session_state import SessionState
+from cleankoda.llm.credentials import CredentialsStore
 
 CONFIG_DIR = Path.home() / ".config" / "cleankoda"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
+class AppConfig(BaseModel):
+    provider: str = "mistral"
+    model: str = "mistral-small-latest"
+    temperature: float = Field(default=0.2, ge=0.0, le=2.0)
+    max_tokens: int = Field(default=4096, gt=0)
 
-def load_session_state() -> SessionState:
-    """Loads the session state from CONFIG_FILE."""
-    return SessionState.load(file_path=CONFIG_FILE)
+    @property
+    def litellm_model_identifier(self) -> str:
+        """Mappt Provider und Modell auf LiteLLM-kompatible Präfixe."""
+        from cleankoda.llm.config import get_provider_config
+
+        provider_lower = self.provider.lower()
+        model_str = self.model
+
+        p_config = get_provider_config(provider_lower)
+        if p_config and p_config.is_custom:
+            if model_str.startswith("openai/"):
+                return model_str
+            return f"openai/{model_str}"
+
+        if "/" in model_str:
+            return model_str
+
+        if provider_lower == "google":
+            if model_str.startswith("gemini/") or model_str.startswith("google/"):
+                return model_str
+            return f"gemini/{model_str}"
+
+        if provider_lower in ["ollama", "openrouter", "anthropic", "openai", "mistral"]:
+            return f"{provider_lower}/{model_str}"
+
+        return f"openai/{model_str}"
+
+    @classmethod
+    def load(cls, file_path: Path = CONFIG_FILE) -> "AppConfig":
+        """Loads the configuration from the JSON file or creates a new one with defaults."""
+        if file_path.is_file():
+            content = file_path.read_text(encoding="utf-8")
+            return cls.model_validate_json(content)
+
+        # If the file does not yet exist: create and save the default object.
+        instance = cls()
+        instance.save(file_path)
+        return instance
+
+    def save(self, file_path: Path = CONFIG_FILE) -> None:
+        """Saves the current state back to the JSON file in a formatted manner."""
+        json_str = self.model_dump_json(indent=2)
+        file_path.write_text(json_str, encoding="utf-8")
+        try:
+            os.chmod(file_path, 0o600)
+        except OSError:
+            pass
+
+    def get_active_api_key(self, credentials_file: Path | None = None) -> str | None:
+        """Holt den aktiven API-Key über den CredentialsStore."""
+        store = CredentialsStore.load(file_path=credentials_file)
+        return store.get_key(self.provider)
 
 
-def save_session_state(state: SessionState) -> None:
-    """Stores the session state in CONFIG_FILE."""
-    state.save(file_path=CONFIG_FILE)
-
-
-def get_provider() -> str | None:
-    """Returns the currently configured provider."""
-    if not CONFIG_FILE.is_file():
-        return None
-    state = load_session_state()
-    return state.provider
-
-
-def set_provider(provider_name: str) -> None:
-    """Set the provider in the configuration and save it.
-    Set the model to the first model in the list of the respective provider.
-    """
-    state = load_session_state()
-    state.provider = provider_name
-    models = get_models_for_provider(provider_name)
-    if models:
-        state.model = models[0]
-    save_session_state(state)
-
-
-def get_models_for_provider(provider_name: str | None = None) -> list[str]:
-    """Returns the list of available models for a provider."""
-    if not provider_name:
-        provider_name = get_provider() or "mistral"
-    return fetch_models_for_provider(provider_name)
-
-
-def get_model() -> str:
-    """Gibt das aktuell konfigurierte LLM-Modell zurück."""
-    state = load_session_state()
-    return state.model
-
-
-def set_model(model_name: str) -> None:
-    """Setzt das Modell in der Konfiguration und speichert diese."""
-    state = load_session_state()
-    state.model = model_name
-    save_session_state(state)
+config = AppConfig.load()

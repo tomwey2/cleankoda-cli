@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.session_state import SessionState, StatusManager
+from cleankoda.statusline import SessionState, StatusManager
 from cleankoda.tools import TOOL_SCHEMAS
 
 

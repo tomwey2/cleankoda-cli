@@ -11,7 +11,8 @@ from litellm.exceptions import (
     ServiceUnavailableError,
 )
 
-from cleankoda.session_state import SessionState, StatusManager
+from cleankoda.config import config
+from cleankoda.statusline import StatusManager
 
 litellm.suppress_debug_info = True
 
@@ -20,9 +21,7 @@ class LLMService:
     """Service encapsulating LiteLLM interaction, cold start handling, and tool display formatting."""
 
     def __init__(self,
-        state: SessionState | Any,
         status_manager: StatusManager | None = None) -> None:
-        self.state = state
         self.status_manager = status_manager
 
     def is_cold_start_error(self, e: Exception) -> bool:
@@ -147,11 +146,9 @@ class LLMService:
         from cleankoda.llm.config import get_provider_config
 
         # --- Step 1: Provider and API configuration ---
-        provider_name = getattr(self.state, "provider", "mistral")
-        provider_config = get_provider_config(provider_name)
-
-        model_identifier = self.state.litellm_model_identifier
-        api_key = self.state.get_active_api_key()
+        provider_config = get_provider_config(config.provider)
+        model_identifier = config.litellm_model_identifier
+        api_key = config.get_active_api_key()
 
         if hasattr(messages, "messages"):
             msg_list = messages.messages
@@ -163,8 +160,8 @@ class LLMService:
         kwargs: dict[str, Any] = {
             "model": model_identifier,
             "messages": msg_list,
-            "temperature": getattr(self.state, "temperature", 0.2),
-            "max_tokens": getattr(self.state, "max_tokens", 4096),
+            "temperature": config.temperature,
+            "max_tokens": config.max_tokens,
             "stream": True,
         }
 
@@ -231,17 +228,17 @@ class LLMService:
             # --- Step 3: Error Handling & Cold Start Retries ---
             except AuthenticationError as e:
                 self._clear_llm_status()
-                yield f"[Authentication Error ({self.state.provider}): Please check your API key. Details: {e}]"
+                yield f"[Authentication Error ({config.provider}): Please check your API key. Details: {e}]"
                 return
             except RateLimitError as e:
                 self._clear_llm_status()
-                yield f"[Rate Limit Exceeded ({self.state.provider}): {e}]"
+                yield f"[Rate Limit Exceeded ({config.provider}): {e}]"
                 return
             except (ServiceUnavailableError, APIConnectionError, APIError) as e:
                 if self.is_cold_start_error(e):
                     attempt += 1
                     messages_to_yield, should_retry = await self._wait_for_cold_start(
-                        provider=getattr(self.state, "provider", "mistral"),
+                        provider=config.provider,
                         attempt=attempt,
                         max_attempts=max_attempts,
                         initial_delay=initial_delay,
@@ -254,11 +251,11 @@ class LLMService:
                 else:
                     self._clear_llm_status()
                     if isinstance(e, (APIConnectionError, ServiceUnavailableError)):
-                        yield f"[Connection Error ({self.state.provider}): Unable to reach server. {e}]"
+                        yield f"[Connection Error ({config.provider}): Unable to reach server. {e}]"
                     else:
-                        yield f"[LLM Error ({self.state.provider}): {e}]"
+                        yield f"[LLM Error ({config.provider}): {e}]"
                     return
             except Exception as e:
                 self._clear_llm_status()
-                yield f"[Unexpected Error ({self.state.provider}): {type(e).__name__} - {e}]"
+                yield f"[Unexpected Error ({config.provider}): {type(e).__name__} - {e}]"
                 return

@@ -7,7 +7,7 @@ from prompt_toolkit.shortcuts import input_dialog, radiolist_dialog
 from prompt_toolkit.widgets import Button, Dialog, RadioList, TextArea
 
 from cleankoda.commands.registry import CommandContext, CommandResult, registry
-from cleankoda.config import get_provider, set_provider
+from cleankoda.config import config
 from cleankoda.llm import CredentialsStore, get_provider_config, get_provider_configs
 
 
@@ -207,8 +207,7 @@ async def cmd_provider(args: list[str], ctx: CommandContext) -> CommandResult:
                 output=f"Invalid provider '{args[0]}'. Available providers: {', '.join(available_providers)}"
             )
     else:
-        current_provider = get_provider()
-        chosen_provider = await select_provider_interactive(ctx, current_provider)
+        chosen_provider = await select_provider_interactive(ctx, config.provider)
         if chosen_provider is None:
             return CommandResult(output="Provider selection cancelled.")
 
@@ -216,7 +215,8 @@ async def cmd_provider(args: list[str], ctx: CommandContext) -> CommandResult:
 
     # Provider ohne Key-Pflicht (z.B. Ollama) benötigen keine Key-Eingabe
     if chosen_config and not chosen_config.requires_api_key:
-        set_provider(chosen_provider)
+        config.provider = chosen_provider
+        config.save()
         return CommandResult(output=f"Provider switched to: {chosen_provider}")
 
     # Key-Status abfragen
@@ -236,11 +236,13 @@ async def cmd_provider(args: list[str], ctx: CommandContext) -> CommandResult:
 
     if key_input.strip() == "":
         if existing_key:
-            set_provider(chosen_provider)
+            config.provider = chosen_provider
+            config.save()
             return CommandResult(output=f"Provider switched to: {chosen_provider} (kept existing API key).")
         elif chosen_config and (chosen_config.is_custom or chosen_config.api_base or not chosen_config.requires_api_key):
             cred_store.set_key(chosen_provider, "")
-            set_provider(chosen_provider)
+            config.provider = chosen_provider
+            config.save()
             return CommandResult(output=f"Provider switched to: {chosen_provider}")
         else:
             return CommandResult(
@@ -249,5 +251,6 @@ async def cmd_provider(args: list[str], ctx: CommandContext) -> CommandResult:
 
     new_key = key_input.strip()
     cred_store.set_key(chosen_provider, new_key)
-    set_provider(chosen_provider)
+    config.provider = chosen_provider
+    config.save()
     return CommandResult(output=f"API key updated. Provider switched to: {chosen_provider}")

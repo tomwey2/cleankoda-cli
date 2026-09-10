@@ -6,7 +6,8 @@ from prompt_toolkit.shortcuts import radiolist_dialog
 from prompt_toolkit.widgets import Button, Dialog, RadioList
 
 from cleankoda.commands.registry import CommandContext, CommandResult, registry
-from cleankoda.config import get_model, get_models_for_provider, get_provider, set_model
+from cleankoda.config import config
+from cleankoda.llm.config import get_models_for_provider
 
 
 async def _show_tui_modal_model_dialog(
@@ -78,7 +79,7 @@ async def select_model_interactive(
     ctx: CommandContext | None = None, default_model: str | None = None
 ) -> str | None:
     """Zeigt einen interaktiven Dialog zur Auswahl des Modells (gefiltert nach aktuellem Provider, ESC bricht ab)."""
-    active_provider = get_provider() or "mistral"
+    active_provider = config.provider
     available_models = get_models_for_provider(active_provider)
 
     app = ctx.app if ctx else None
@@ -109,14 +110,16 @@ async def cmd_model(args: list[str], ctx: CommandContext) -> CommandResult:
     """Slash-Command Handler für /model."""
     if args:
         new_model = args[0].strip()
-        set_model(new_model)
+        config.model = new_model
+        config.save()
         return CommandResult(output=f"Model switched to: {new_model}")
 
-    current_model = get_model()
+    current_model = config.model
     selected_model = await select_model_interactive(ctx, current_model)
 
     if selected_model is None:
         return CommandResult(output="Model selection cancelled.")
 
-    set_model(selected_model)
+    config.model = selected_model
+    config.save()
     return CommandResult(output=f"Model switched to: {selected_model}")

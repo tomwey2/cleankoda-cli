@@ -11,7 +11,7 @@ from litellm.exceptions import (
 
 from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
-from cleankoda.session_state import SessionState
+from cleankoda.statusline import SessionState
 
 
 class TestLLMService(unittest.TestCase):

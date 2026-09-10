@@ -5,9 +5,7 @@ from cleankoda.sandbox.base import ExecutionEnvironment
 from cleankoda.sandbox.config import DEFAULT_IMAGE
 from cleankoda.sandbox.docker_env import DockerSandbox
 from cleankoda.sandbox.host_env import HostSandbox
-
-if TYPE_CHECKING:
-    from cleankoda.session_state import StatusManager
+from cleankoda.statusline import StatusManager
 
 
 class SandboxManager:
@@ -17,7 +15,7 @@ class SandboxManager:
         self,
         workspace_path: Path,
         default_image: str | None = DEFAULT_IMAGE,
-        status_manager: "StatusManager | None" = None,
+        status_manager: StatusManager | None = None,
     ) -> None:
         self.workspace_path = workspace_path.resolve()
         self.status_manager = status_manager

@@ -1,5 +1,5 @@
 import unittest
-from cleankoda.session_state import StatusManager
+from cleankoda.statusline import StatusManager
 
 
 class TestStatusManager(unittest.TestCase):

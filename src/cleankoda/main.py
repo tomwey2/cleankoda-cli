@@ -6,7 +6,7 @@ from cleankoda.agent import SYSTEM_PROMPT, Agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.session_state import SessionState, StatusManager
+from cleankoda.statusline import StatusManager
 from cleankoda.tools import TOOL_SCHEMAS, sandbox_manager
 from cleankoda.tui import run_tui
 
@@ -82,20 +82,18 @@ def main(argv: list[str] | None = None) -> None:
         final_prompt = prompt or piped_input
 
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
-    state = SessionState.load()
     status_manager = StatusManager()
-    llm_service = LLMService(state=state, status_manager=status_manager)
+    llm_service = LLMService(status_manager=status_manager)
 
     agent = Agent(
         memory=memory,
         llm_service=llm_service,
         tools=TOOL_SCHEMAS,
-        state=state,
         status_manager=status_manager,
     )
 
     if args.tui:
-        run_tui(agent)
+        run_tui(agent=agent, status_manager=status_manager)
     elif args.headless or final_prompt is not None:
         if not final_prompt:
             print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
@@ -104,7 +102,7 @@ def main(argv: list[str] | None = None) -> None:
         if isinstance(code, int) and code != 0:
             sys.exit(code)
     else:
-        run_tui(agent)
+        run_tui(agent, status_manager)
 
 
 if __name__ == "__main__":

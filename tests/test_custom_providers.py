@@ -16,7 +16,7 @@ from cleankoda.llm.config import (
     load_provider_registry,
 )
 from cleankoda.llm.service import LLMService
-from cleankoda.session_state import SessionState
+from cleankoda.statusline import SessionState
 
 
 class TestCustomProviders(unittest.TestCase):

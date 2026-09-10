@@ -5,7 +5,7 @@ from litellm import stream_chunk_builder
 
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.session_state import SessionState, StatusManager
+from cleankoda.statusline import StatusManager
 from cleankoda.tools import run_tool
 
 SYSTEM_PROMPT = """You are a coding agent running in the user's terminal.
@@ -22,13 +22,11 @@ class Agent:
         memory: Memory,
         llm_service: LLMService,
         tools: list[dict[str, Any]],
-        state: SessionState,
         status_manager: StatusManager | None = None,
     ) -> None:
         self.memory = memory
         self.llm_service = llm_service
         self.tools = tools
-        self.state = state
         self.status_manager = status_manager
 
     async def run(

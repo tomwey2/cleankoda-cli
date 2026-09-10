@@ -14,7 +14,7 @@ from cleankoda.config import (
     set_provider,
 )
 from cleankoda.llm.config import PROVIDER_MODELS, PROVIDERS
-from cleankoda.session_state import SessionState
+from cleankoda.statusline import SessionState
 
 
 class TestConfig(unittest.TestCase):
