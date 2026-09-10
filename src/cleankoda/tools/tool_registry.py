@@ -5,11 +5,11 @@ from cleankoda.sandbox.config import DEFAULT_IMAGE
 from cleankoda.sandbox.manager import SandboxManager
 from cleankoda.tools.bash import BashCommand
 from cleankoda.tools.filesystem import JailedFilesystem
+from cleankoda.config import config
 
 # Instanzen für den aktuellen Projektordner
-workspace = Path.cwd()
-fs = JailedFilesystem(workspace_root=workspace)
-sandbox_manager = SandboxManager(workspace_path=workspace, default_image=DEFAULT_IMAGE)
+fs = JailedFilesystem(workspace_root=config.workspace)
+sandbox_manager = SandboxManager(workspace_path=config.workspace, default_image=DEFAULT_IMAGE)
 bash_tool = BashCommand(sandbox_manager=sandbox_manager)
 
 # Das einheitliche, rein asynchrone Tool-Dictionary

@@ -1,6 +1,7 @@
 import argparse
 import asyncio
 import sys
+from pathlib import Path
 
 from cleankoda.agent import SYSTEM_PROMPT, Agent
 from cleankoda.commands import CommandContext, registry
@@ -9,6 +10,14 @@ from cleankoda.memory import Memory
 from cleankoda.statusline import statusline
 from cleankoda.tools import TOOL_SCHEMAS, sandbox_manager
 from cleankoda.tui import run_tui
+from cleankoda.config import config
+
+
+def set_workspace() -> None:
+    workspace = Path.cwd()
+    if workspace != config.workspace:
+        config.workspace = workspace
+        config.save()
 
 
 def headless_status_callback(status: str) -> None:
@@ -80,6 +89,7 @@ def main(argv: list[str] | None = None) -> None:
     else:
         final_prompt = prompt or piped_input
 
+    set_workspace()
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
     llm_service = LLMService()
 

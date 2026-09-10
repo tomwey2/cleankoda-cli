@@ -8,6 +8,7 @@ CONFIG_DIR = Path.home() / ".config" / "cleankoda"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
 class AppConfig(BaseModel):
+    workspace: Path = Path.cwd()
     provider: str = "mistral"
     model: str = "mistral-small-latest"
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
