@@ -1,4 +1,4 @@
-from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.commands.command_registry import CommandContext, CommandResult, registry
 
 
 @registry.register(

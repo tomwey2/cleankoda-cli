@@ -6,7 +6,7 @@ from prompt_toolkit.layout.controls import FormattedTextControl
 from prompt_toolkit.shortcuts import input_dialog, radiolist_dialog
 from prompt_toolkit.widgets import Button, Dialog, RadioList, TextArea
 
-from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.commands.command_registry import CommandContext, CommandResult, registry
 from cleankoda.config import config
 from cleankoda.llm import CredentialsStore, get_provider_config, get_provider_configs
 from cleankoda.llm.config import get_models_for_provider

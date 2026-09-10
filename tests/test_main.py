@@ -25,7 +25,7 @@ class TestMainDualMode(unittest.TestCase):
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
-                run_headless("/help", agent=agent)
+                run_headless(agent, "/help")
             output = captured_output.getvalue()
             self.assertIn("Available Commands:", output)
             self.assertIn("/exit", output)
@@ -49,7 +49,7 @@ class TestMainDualMode(unittest.TestCase):
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
-                run_headless("What is 1+1?", agent=agent)
+                run_headless(agent, "What is 1+1?")
             output = captured_output.getvalue()
             self.assertIn("Test response from agent", output)
             mock_agent_run.assert_called_once()
@@ -57,7 +57,7 @@ class TestMainDualMode(unittest.TestCase):
     @patch("cleankoda.main.run_headless")
     def test_main_with_positional_prompt(self, mock_run_headless):
         main(["Explain", "this", "code"])
-        mock_run_headless.assert_called_once_with("Explain this code", agent=ANY)
+        mock_run_headless.assert_called_once_with(ANY, "Explain this code")
 
     @patch("cleankoda.main.run_tui")
     def test_main_with_tui_flag(self, mock_run_tui):
@@ -69,7 +69,7 @@ class TestMainDualMode(unittest.TestCase):
         with patch("sys.stdin.isatty", return_value=False):
             with patch("sys.stdin.read", return_value="Piped input prompt"):
                 main([])
-                mock_run_headless.assert_called_once_with("Piped input prompt", agent=ANY)
+                mock_run_headless.assert_called_once_with(ANY, "Piped input prompt")
 
     def test_main_headless_missing_prompt_exits(self):
         with patch("sys.stdin.isatty", return_value=True):

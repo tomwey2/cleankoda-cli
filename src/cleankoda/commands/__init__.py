@@ -1,6 +1,6 @@
 import importlib
 import pkgutil
-from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.commands.command_registry import CommandContext, CommandResult, registry
 
 
 def _load_commands() -> None:

@@ -4,7 +4,7 @@ from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.widgets import Button, Dialog, RadioList
 
-from cleankoda.commands.registry import CommandContext, CommandResult, registry
+from cleankoda.commands.command_registry import CommandContext, CommandResult, registry
 from cleankoda.sandbox import AVAILABLE_IMAGES
 from cleankoda.tools.tool_registry import sandbox_manager
 from cleankoda.config import config
