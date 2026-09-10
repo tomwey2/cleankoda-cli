@@ -7,6 +7,7 @@ from prompt_toolkit.widgets import Button, Dialog, RadioList
 from cleankoda.commands.registry import CommandContext, CommandResult, registry
 from cleankoda.sandbox import AVAILABLE_IMAGES
 from cleankoda.tools.tool_registry import sandbox_manager
+from cleankoda.config import config
 
 
 async def _show_tui_modal_sandbox_dialog(
@@ -112,6 +113,8 @@ async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
             ctx.app.invalidate()
 
         msg = await sandbox_manager.switch_environment(target)
+        config.sandbox = target
+        config.save()
 
     if ctx.app:
         ctx.app.invalidate()

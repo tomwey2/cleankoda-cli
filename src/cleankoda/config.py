@@ -1,3 +1,4 @@
+from cleankoda import sandbox
 import os
 from pathlib import Path
 from pydantic import BaseModel, Field
@@ -13,6 +14,7 @@ class AppConfig(BaseModel):
     model: str = "mistral-small-latest"
     temperature: float = Field(default=0.2, ge=0.0, le=2.0)
     max_tokens: int = Field(default=4096, gt=0)
+    sandbox: str = ""
 
     @property
     def litellm_model_identifier(self) -> str:
