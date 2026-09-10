@@ -1,9 +1,8 @@
 from collections.abc import Callable
 from dataclasses import dataclass, field
 
-@dataclass
-class StatusManager:
-    _slots: dict[str, str] = field(default_factory=dict)
+class StatusLine:
+    _slots: dict[str, str] = {}
     on_change: Callable[[str], None] | Callable[[], None] | None = None
 
     def set(self, source: str, message: str) -> None:
@@ -31,3 +30,6 @@ class StatusManager:
                 self.on_change(combined)  # type: ignore[call-arg]
             except TypeError:
                 self.on_change()  # type: ignore[call-arg]
+
+
+statusline = StatusLine()

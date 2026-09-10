@@ -15,7 +15,7 @@ from prompt_toolkit.widgets import Frame, TextArea
 from cleankoda.config import config
 from cleankoda.agent import Agent
 from cleankoda.commands import CommandContext, registry
-from cleankoda.statusline import StatusManager
+from cleankoda.statusline import statusline
 from cleankoda.tools import TOOL_SCHEMAS, get_sandbox_status, sandbox_manager
 
 
@@ -188,14 +188,8 @@ class ChatLexer(Lexer):
 class TUI:
     """Terminal User Interface application for cleankoda cli."""
 
-    def __init__(
-        self,
-        agent: Agent,
-        status_manager: StatusManager,
-    ) -> None:
+    def __init__(self, agent: Agent) -> None:
         self.agent = agent
-        self.status_manager = status_manager
-        self.status_manager.on_change = self._on_status_changed
         self.showing_shortcuts = False
         self.is_processing = False
         self._cancel_event: asyncio.Event | None = None
@@ -262,7 +256,7 @@ class TUI:
         )
         self.app.float_container = self.float_container
 
-    def _on_status_changed(self, status: str = "") -> None:
+    def on_status_changed(self, status: str = "") -> None:
         self.update_status_line()
         try:
             if hasattr(self, "app") and self.app:
@@ -292,7 +286,7 @@ class TUI:
                 "• Ctrl+Q  : Exit application"
             )
         else:
-            active_status = self.status_manager.get_combined_status()
+            active_status = statusline.get_combined_status()
             self.status_line.window.height = 2
             if active_status:
                 self.status_line.text = f"{session_text}\n▶ {active_status}"
@@ -398,10 +392,8 @@ class TUI:
             sandbox_manager.stop()
 
 
-def run_tui(
-    agent: Agent,
-    status_manager: StatusManager | None = None,
-) -> None:
+def run_tui(agent: Agent) -> None:
     """Start the interactive TUI application with the provided Agent instance."""
-    tui = TUI(agent, status_manager=status_manager)
+    tui = TUI(agent)
+    statusline.on_change = tui.on_status_changed
     tui.run()

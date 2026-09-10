@@ -7,7 +7,7 @@ from unittest.mock import MagicMock, patch
 from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.statusline import SessionState, StatusManager
+from cleankoda.statusline import SessionState, StatusLine
 from cleankoda.tools import TOOL_SCHEMAS
 
 
@@ -17,7 +17,7 @@ class TestAgentLoop(unittest.TestCase):
         state = SessionState(provider="openai", model="gpt-4o")
         mem = Memory(system_prompt="Test")
         ls = LLMService(state=state)
-        status_mgr = StatusManager()
+        status_mgr = StatusLine()
         agent = Agent(
             memory=mem,
             llm_service=ls,
@@ -147,7 +147,7 @@ class TestAgentLoop(unittest.TestCase):
                         chunks_out.append(text_chunk)
                     yield "Done."
 
-            status_mgr = StatusManager(on_change=status_cb)
+            status_mgr = StatusLine(on_change=status_cb)
 
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm), patch(
                 "cleankoda.agent.run_tool", return_value="file1.txt"

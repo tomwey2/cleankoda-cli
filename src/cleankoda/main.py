@@ -6,7 +6,7 @@ from cleankoda.agent import SYSTEM_PROMPT, Agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.statusline import StatusManager
+from cleankoda.statusline import statusline
 from cleankoda.tools import TOOL_SCHEMAS, sandbox_manager
 from cleankoda.tui import run_tui
 
@@ -21,8 +21,7 @@ async def _run_headless_agent(
     agent: Agent,
 ) -> int:
     agent.memory.add_user(prompt_text)
-    if agent.status_manager is not None:
-        agent.status_manager.on_change = headless_status_callback
+    statusline.on_change = headless_status_callback
     try:
         async for chunk in agent.run():
             print(chunk, end="", flush=True)
@@ -82,19 +81,15 @@ def main(argv: list[str] | None = None) -> None:
         final_prompt = prompt or piped_input
 
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
-    status_manager = StatusManager()
-    llm_service = LLMService(status_manager=status_manager)
+    llm_service = LLMService()
 
     agent = Agent(
         memory=memory,
         llm_service=llm_service,
         tools=TOOL_SCHEMAS,
-        status_manager=status_manager,
     )
 
-    if args.tui:
-        run_tui(agent=agent, status_manager=status_manager)
-    elif args.headless or final_prompt is not None:
+    if args.headless or final_prompt is not None:
         if not final_prompt:
             print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
             sys.exit(1)
@@ -102,7 +97,7 @@ def main(argv: list[str] | None = None) -> None:
         if isinstance(code, int) and code != 0:
             sys.exit(code)
     else:
-        run_tui(agent, status_manager)
+        run_tui(agent)
 
 
 if __name__ == "__main__":

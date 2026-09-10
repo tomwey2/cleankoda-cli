@@ -1,15 +1,15 @@
 import unittest
-from cleankoda.statusline import StatusManager
+from cleankoda.statusline import StatusLine
 
 
 class TestStatusManager(unittest.TestCase):
 
     def test_empty_status_manager(self):
-        sm = StatusManager()
+        sm = StatusLine()
         self.assertEqual(sm.get_combined_status(), "")
 
     def test_set_and_get_combined_status(self):
-        sm = StatusManager()
+        sm = StatusLine()
         sm.set("sandbox", "Sandbox: Startet (docker:latest)...")
         self.assertEqual(sm.get_combined_status(), "Sandbox: Startet (docker:latest)...")
 
@@ -20,7 +20,7 @@ class TestStatusManager(unittest.TestCase):
         )
 
     def test_clear_status(self):
-        sm = StatusManager()
+        sm = StatusLine()
         sm.set("sandbox", "Sandbox active")
         sm.set("tool", "Führe Tool aus: run_bash...")
         sm.clear("sandbox")
@@ -30,7 +30,7 @@ class TestStatusManager(unittest.TestCase):
         self.assertEqual(sm.get_combined_status(), "")
 
     def test_observer_on_change(self):
-        sm = StatusManager()
+        sm = StatusLine()
         notifications = 0
 
         def on_change_cb():
@@ -65,7 +65,7 @@ class TestStatusManager(unittest.TestCase):
         def on_change_cb(status: str):
             statuses_received.append(status)
 
-        sm = StatusManager(on_change=on_change_cb)
+        sm = StatusLine(on_change=on_change_cb)
         sm.set("tool", "Execute tool: list_files...")
         self.assertEqual(statuses_received, ["Execute tool: list_files..."])
 

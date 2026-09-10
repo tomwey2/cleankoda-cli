@@ -5,7 +5,7 @@ from cleankoda.sandbox.base import ExecutionEnvironment
 from cleankoda.sandbox.config import DEFAULT_IMAGE
 from cleankoda.sandbox.docker_env import DockerSandbox
 from cleankoda.sandbox.host_env import HostSandbox
-from cleankoda.statusline import StatusManager
+from cleankoda.statusline import statusline
 
 
 class SandboxManager:
@@ -15,10 +15,8 @@ class SandboxManager:
         self,
         workspace_path: Path,
         default_image: str | None = DEFAULT_IMAGE,
-        status_manager: StatusManager | None = None,
     ) -> None:
         self.workspace_path = workspace_path.resolve()
-        self.status_manager = status_manager
         self.current_env: ExecutionEnvironment = HostSandbox(self.workspace_path)
         self.is_starting: bool = False
         if default_image and default_image != "host":
@@ -35,8 +33,7 @@ class SandboxManager:
 
         if image and image != "host":
             self.is_starting = True
-            if self.status_manager:
-                self.status_manager.set("sandbox", f"Sandbox: start ({image})...")
+            statusline.set("sandbox", f"Sandbox: start ({image})...")
             try:
                 new_env = DockerSandbox(self.workspace_path, image=image)
                 await new_env.start_async()
@@ -47,12 +44,10 @@ class SandboxManager:
                 return f"Error starting sandbox ({exc}). Fallback to host system."
             finally:
                 self.is_starting = False
-                if self.status_manager:
-                    self.status_manager.clear("sandbox")
+                statusline.clear("sandbox")
         else:
             self.is_starting = False
-            if self.status_manager:
-                self.status_manager.clear("sandbox")
+            statusline.clear("sandbox")
             self.current_env = HostSandbox(self.workspace_path)
             return "Sandbox disabled: Commands run directly on the host."
 

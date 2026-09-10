@@ -12,17 +12,13 @@ from litellm.exceptions import (
 )
 
 from cleankoda.config import config
-from cleankoda.statusline import StatusManager
+from cleankoda.statusline import statusline
 
 litellm.suppress_debug_info = True
 
 
 class LLMService:
     """Service encapsulating LiteLLM interaction, cold start handling, and tool display formatting."""
-
-    def __init__(self,
-        status_manager: StatusManager | None = None) -> None:
-        self.status_manager = status_manager
 
     def is_cold_start_error(self, e: Exception) -> bool:
         """Checks whether an exception indicates a serverless cold start / loading model state."""
@@ -81,10 +77,6 @@ class LLMService:
 
         return f"{func_name}()"
 
-    def _clear_llm_status(self) -> None:
-        """Helper to clear active LLM status indicators."""
-        if self.status_manager:
-            self.status_manager.clear("llm")
 
     async def _wait_for_cold_start(
         self,
@@ -97,7 +89,7 @@ class LLMService:
         """Handles cold start status notifications, exponential backoff delay, and cancellation checks."""
         if attempt > max_attempts:
             err_msg = f"LLM could not be started after {max_attempts} attempts."
-            self._clear_llm_status()
+            statusline.clear("llm")
             return [f"[LLM Error ({provider}): {err_msg}]\n"], False
 
         # Calculate exponential backoff delay (10s, 20s, 40s, ...)
@@ -106,18 +98,16 @@ class LLMService:
             f"LLM Cold Start: attempt {attempt}/{max_attempts} ({int(current_delay)}s) [Esc to cancel]"
         )
 
-        if self.status_manager:
-            self.status_manager.set("llm", status_text)
+        statusline.set("llm", status_text)
 
         output_messages: list[str] = []
-        if not self.status_manager:
-            output_messages.append(f"[yellow]⟳ {status_text}[/yellow]\n")
+        output_messages.append(f"[yellow]⟳ {status_text}[/yellow]\n")
 
         # Wait for delay or handle cancel_event
         if cancel_event is not None:
             try:
                 await asyncio.wait_for(cancel_event.wait(), timeout=current_delay)
-                self._clear_llm_status()
+                statusline.clear("llm")
                 output_messages.append("[yellow]LLM startup aborted.[/yellow]\n")
                 return output_messages, False
             except asyncio.TimeoutError:
@@ -182,8 +172,7 @@ class LLMService:
         while True:
             try:
                 # Initiate streaming completion via LiteLLM (`acompletion` returns an async generator of stream chunks)
-                if self.status_manager:
-                    self.status_manager.set("llm", "call llm")
+                statusline.set("llm", "call llm")
                 response = await litellm.acompletion(**kwargs)
 
                 # Iterate through incoming streaming chunks as they arrive from the LLM provider
@@ -213,25 +202,23 @@ class LLMService:
                     if content:
                         # Notify user if model succeeded after a cold start retry
                         if attempt > 0 and not model_ready_notified:
-                            if self.status_manager:
-                                self.status_manager.clear("llm")
-                            else:
-                                yield "[green]✔ Model ready.[/green]\n"
+                            statusline.clear("llm")
+                            yield "[green]✔ Model ready.[/green]\n"
                             model_ready_notified = True
 
                         # Yield content token immediately to stream it live to UI / CLI
                         yield content
 
-                self._clear_llm_status()
+                statusline.clear("llm")
                 break
 
             # --- Step 3: Error Handling & Cold Start Retries ---
             except AuthenticationError as e:
-                self._clear_llm_status()
+                statusline.clear("llm")
                 yield f"[Authentication Error ({config.provider}): Please check your API key. Details: {e}]"
                 return
             except RateLimitError as e:
-                self._clear_llm_status()
+                statusline.clear("llm")
                 yield f"[Rate Limit Exceeded ({config.provider}): {e}]"
                 return
             except (ServiceUnavailableError, APIConnectionError, APIError) as e:
@@ -249,13 +236,13 @@ class LLMService:
                     if not should_retry:
                         return
                 else:
-                    self._clear_llm_status()
+                    statusline.clear("llm")
                     if isinstance(e, (APIConnectionError, ServiceUnavailableError)):
                         yield f"[Connection Error ({config.provider}): Unable to reach server. {e}]"
                     else:
                         yield f"[LLM Error ({config.provider}): {e}]"
                     return
             except Exception as e:
-                self._clear_llm_status()
+                statusline.clear("llm")
                 yield f"[Unexpected Error ({config.provider}): {type(e).__name__} - {e}]"
                 return
