@@ -25,8 +25,8 @@ def headless_status_callback(status: str) -> None:
 
 
 async def _run_headless_agent(
-    prompt_text: str,
     agent: Agent,
+    prompt_text: str,
 ) -> int:
     agent.memory.add_user(prompt_text)
     statusline.on_change = headless_status_callback
@@ -41,8 +41,8 @@ async def _run_headless_agent(
 
 
 def run_headless(
+    agent: Agent,
     prompt_text: str,
-    agent: Agent | None = None,
 ) -> int:
     """Execute the prompt in headless mode without TUI.
 
@@ -57,7 +57,7 @@ def run_headless(
                 print(result.output)
             return 0
 
-        return asyncio.run(_run_headless_agent(prompt_text, agent))
+        return asyncio.run(_run_headless_agent(agent, prompt_text))
     finally:
         sandbox_manager.stop()
 
@@ -111,7 +111,7 @@ def main(argv: list[str] | None = None) -> None:
         if not final_prompt:
             print("Error: Headless mode requires a prompt argument or piped standard input.", file=sys.stderr)
             sys.exit(1)
-        code = run_headless(final_prompt, agent=agent)
+        code = run_headless(agent, final_prompt)
         if isinstance(code, int) and code != 0:
             sys.exit(code)
     else:
