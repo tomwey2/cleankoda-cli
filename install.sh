@@ -12,6 +12,14 @@ info() { echo -e "\033[1;34m::\033[0m $*"; }
 success() { echo -e "\033[1;32m✓\033[0m $*"; }
 error() { echo -e "\033[1;31m✖ Error:\033[0m $*" >&2; exit 1; }
 
+# Safe cleanup on exit
+cleanup() {
+    if [ -n "${TMP_DIR:-}" ] && [ -d "${TMP_DIR:-}" ]; then
+        rm -rf "$TMP_DIR"
+    fi
+}
+trap cleanup EXIT
+
 # 1. Detect Operating System
 detect_os() {
     local os
@@ -34,15 +42,8 @@ detect_arch() {
     esac
 }
 
-cleanup() {
-    if [ -n "$TMP_DIR" ] && [ -d "$TMP_DIR" ]; then
-        rm -rf "$TMP_DIR"
-    fi
-}
-trap cleanup EXIT
-
 main() {
-    local os arch filename download_url tmp_dir
+    local os arch filename download_url
 
     os="$(detect_os)"
     arch="$(detect_arch)"
@@ -58,11 +59,10 @@ main() {
     command -v tar >/dev/null 2>&1  || error "'tar' is required but not installed."
 
     # Create temporary scratch directory
-    tmp_dir="$(mktemp -d)"
-    trap 'rm -rf "$tmp_dir"' EXIT
+    TMP_DIR="$(mktemp -d)"
 
     info "Downloading ${filename} from GitHub..."
-    if ! curl -fsSL "$download_url" -o "${tmp_dir}/${filename}"; then
+    if ! curl -fsSL "$download_url" -o "${TMP_DIR}/${filename}"; then
         error "Failed to download asset from ${download_url}.\nPlease verify that a release exists with asset '${filename}'."
     fi
 
@@ -70,13 +70,13 @@ main() {
     mkdir -p "$INSTALL_DIR"
 
     info "Extracting binary to ${INSTALL_DIR}..."
-    tar -xzf "${tmp_dir}/${filename}" -C "$tmp_dir"
+    tar -xzf "${TMP_DIR}/${filename}" -C "$TMP_DIR"
 
-    if [ ! -f "${tmp_dir}/${APP_NAME}" ]; then
+    if [ ! -f "${TMP_DIR}/${APP_NAME}" ]; then
         error "Archive did not contain executable '${APP_NAME}'."
     fi
 
-    mv "${tmp_dir}/${APP_NAME}" "${INSTALL_DIR}/${APP_NAME}"
+    mv "${TMP_DIR}/${APP_NAME}" "${INSTALL_DIR}/${APP_NAME}"
     chmod +x "${INSTALL_DIR}/${APP_NAME}"
 
     success "Successfully installed ${APP_NAME} to ${INSTALL_DIR}/${APP_NAME}!"

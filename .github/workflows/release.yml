@@ -51,6 +51,8 @@ jobs:
             --paths src \
             --collect-all prompt_toolkit \
             --collect-all litellm \
+            --collect-all tiktoken \
+            --collect-all tiktoken_ext \
             src/cleankoda/main.py
 
       - name: Package Binary into Tarball
