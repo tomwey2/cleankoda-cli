@@ -5,9 +5,8 @@ from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.widgets import Button, Dialog, RadioList
 
 from cleankoda.commands.command_registry import CommandContext, CommandResult, registry
-from cleankoda.sandbox import AVAILABLE_IMAGES
-from cleankoda.tools.tool_registry import sandbox_manager
 from cleankoda.config import config
+from cleankoda.sandbox import AVAILABLE_IMAGES
 
 
 async def _show_tui_modal_sandbox_dialog(
@@ -84,7 +83,8 @@ async def select_sandbox_interactive(
     float_container = getattr(app, "float_container", None) if app else None
 
     if app and float_container:
-        status = current_status or sandbox_manager.get_status()
+        tool_registry = getattr(ctx.agent, "tool_registry", None) if ctx else None
+        status = current_status or (tool_registry.get_sandbox_status() if tool_registry else "host")
         return await _show_tui_modal_sandbox_dialog(app, float_container, status)
 
     return None
@@ -97,6 +97,10 @@ async def select_sandbox_interactive(
 )
 async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
     """Slash-Command Handler für /sandbox."""
+    tool_registry = getattr(ctx.agent, "tool_registry", None) if ctx and ctx.agent else None
+    if not tool_registry:
+        return CommandResult(output="Error: ToolRegistry is not available in command context.")
+
     if args:
         target = args[0].strip()
     else:
@@ -105,14 +109,16 @@ async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
             return CommandResult(output="Sandbox-Auswahl abgebrochen.")
 
     if target.lower() in ("off", "host"):
-        msg = await sandbox_manager.switch_environment(None)
+        msg = await tool_registry.switch_runner(False)
+        config.sandbox = "host"
+        config.save()
     else:
         # Sofort Statuszeile aktualisieren
-        sandbox_manager.is_starting = True
+        tool_registry.sandbox_manager.is_starting = True
         if ctx.app:
             ctx.app.invalidate()
 
-        msg = await sandbox_manager.switch_environment(target)
+        msg = await tool_registry.switch_runner(True, target)
         config.sandbox = target
         config.save()
 

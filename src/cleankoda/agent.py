@@ -1,25 +1,26 @@
 import asyncio
-from typing import Any, AsyncGenerator
 from enum import Enum, auto
+from typing import Any, AsyncGenerator
 
 from litellm import stream_chunk_builder
 
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.statusline import statusline
-from cleankoda.tools import run_tool
+from cleankoda.tools import ToolRegistry
 
 SYSTEM_PROMPT = """You are a coding agent running in the user's terminal.
 You can list files, read files, write files, and run shell commands.
 Use your tools to complete the user's task, then briefly summarize what you did.
 The working directory is the folder the user launched you from."""
 
+
 class AgentLifecycle(Enum):
-  IDLE = auto()
-  THINKING = auto()
-  EXECUTING = auto()
-  AWAITING_CONFIRMATION = auto()
-  ERROR = auto()
+    IDLE = auto()
+    THINKING = auto()
+    EXECUTING = auto()
+    AWAITING_CONFIRMATION = auto()
+    ERROR = auto()
 
 
 class Agent:
@@ -29,12 +30,14 @@ class Agent:
         self,
         memory: Memory,
         llm_service: LLMService,
+        tool_registry: ToolRegistry,
         tools: list[dict[str, Any]],
     ) -> None:
         self.memory = memory
         self.llm_service = llm_service
+        self.tool_registry = tool_registry
         self.tools = tools
-        self.state =AgentLifecycle.IDLE
+        self.state = AgentLifecycle.IDLE
 
     async def run(
         self,
@@ -119,7 +122,7 @@ class Agent:
 
                 try:
                     self._set_state(AgentLifecycle.EXECUTING, f"Execute tool: {func_name}...")
-                    tool_result = await run_tool(tool_call)
+                    tool_result = await self.tool_registry.run_tool(tool_call)
                 finally:
                     self._set_state(AgentLifecycle.THINKING)
 
@@ -130,7 +133,6 @@ class Agent:
                 }
                 self.memory.add_message(tool_msg)
         statusline.clear("agent")
-
 
     def is_busy(self) -> bool:
         """Convenient lookup for TUI keybindings and input locks."""

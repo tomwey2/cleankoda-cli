@@ -1,27 +1,29 @@
 import io
 import sys
 import unittest
-from unittest.mock import patch, MagicMock, ANY
+from pathlib import Path
+from unittest.mock import ANY, MagicMock, patch
 
 from cleankoda.agent import Agent
 from cleankoda.llm import LLMService
 from cleankoda.main import main, run_headless
 from cleankoda.memory import Memory
-from cleankoda.tools import TOOL_SCHEMAS
+from cleankoda.tools import ToolRegistry
 
 
 class TestMainDualMode(unittest.TestCase):
 
     def test_run_headless_slash_command(self):
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
+            tr = ToolRegistry(workspace=Path(tmpdir), sandbox_image=None)
             agent = Agent(
                 memory=mem,
                 llm_service=LLMService(),
-                tools=TOOL_SCHEMAS,
+                tool_registry=tr,
+                tools=tr.schemas,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -33,7 +35,6 @@ class TestMainDualMode(unittest.TestCase):
     @patch("cleankoda.agent.Agent.run")
     def test_run_headless_agent_call(self, mock_agent_run):
         import tempfile
-        from pathlib import Path
 
         async def _mock_run_agent(*args, **kwargs):
             yield "Test response from agent"
@@ -42,10 +43,12 @@ class TestMainDualMode(unittest.TestCase):
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
+            tr = ToolRegistry(workspace=Path(tmpdir), sandbox_image=None)
             agent = Agent(
                 memory=mem,
                 llm_service=LLMService(),
-                tools=TOOL_SCHEMAS,
+                tool_registry=tr,
+                tools=tr.schemas,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -80,12 +83,12 @@ class TestMainDualMode(unittest.TestCase):
 
     def test_status_line_structure(self):
         import tempfile
-        from pathlib import Path
         from cleankoda.tui import TUI
 
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
-            agent = Agent(memory=mem, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+            tr = ToolRegistry(workspace=Path(tmpdir), sandbox_image=None)
+            agent = Agent(memory=mem, llm_service=LLMService(), tool_registry=tr, tools=tr.schemas)
             tui = TUI(agent)
             tui.update_status_line()
             lines = tui.status_line.text.splitlines()
@@ -99,7 +102,6 @@ class TestMainDualMode(unittest.TestCase):
     @patch("cleankoda.main.set_workspace")
     def test_main_workspace_valid(self, mock_set_workspace, mock_run_tui):
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_path = Path(tmpdir)
@@ -109,7 +111,6 @@ class TestMainDualMode(unittest.TestCase):
     @patch("cleankoda.main.set_workspace")
     def test_main_workspace_invalid(self, mock_set_workspace):
         import tempfile
-        from pathlib import Path
 
         with tempfile.TemporaryDirectory() as tmpdir:
             non_existent = Path(tmpdir) / "does_not_exist"
@@ -123,8 +124,6 @@ class TestMainDualMode(unittest.TestCase):
     @patch("cleankoda.main.run_tui")
     @patch("cleankoda.main.set_workspace")
     def test_main_workspace_default(self, mock_set_workspace, mock_run_tui):
-        from pathlib import Path
-
         main(["--tui"])
         mock_set_workspace.assert_called_once_with(Path.cwd())
 

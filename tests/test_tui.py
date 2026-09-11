@@ -1,9 +1,10 @@
 import unittest
-from prompt_toolkit.document import Document
+from pathlib import Path
 from prompt_toolkit.document import Document
 from cleankoda.commands import registry
 from cleankoda.tui import SlashCommandCompleter, TUI_STYLE
 from cleankoda.memory import Memory
+from cleankoda.tools import ToolRegistry
 
 
 class TestSlashCommandCompleter(unittest.TestCase):
@@ -110,7 +111,8 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tr = ToolRegistry(workspace=Path.cwd(), sandbox_image=None)
+        agent = Agent(memory=memory, llm_service=LLMService(), tool_registry=tr, tools=TOOL_SCHEMAS)
         tui = TUI(agent)
         tui.input_field.text = "/model"
 
@@ -127,7 +129,8 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tr = ToolRegistry(workspace=Path.cwd(), sandbox_image=None)
+        agent = Agent(memory=memory, llm_service=LLMService(), tool_registry=tr, tools=TOOL_SCHEMAS)
         tui = TUI(agent)
         tui.input_field.text = "Hello world"
 
@@ -159,7 +162,8 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         mock_get_app.return_value = mock_app
 
         memory = Memory(system_prompt="Test")
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tr = ToolRegistry(workspace=Path.cwd(), sandbox_image=None)
+        agent = Agent(memory=memory, llm_service=LLMService(), tool_registry=tr, tools=TOOL_SCHEMAS)
         tui = TUI(agent)
         tui.input_field.text = "/m"
         tui.input_field.buffer.cursor_position = 2
@@ -191,7 +195,8 @@ class TestTUIStatusManager(unittest.TestCase):
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS)
+        tr = ToolRegistry(workspace=Path.cwd(), sandbox_image=None)
+        agent = Agent(memory=memory, llm_service=LLMService(), tool_registry=tr, tools=TOOL_SCHEMAS)
         tui = TUI(agent)
         statusline.on_change = tui.on_status_changed
         mock_app = MagicMock()

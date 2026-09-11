@@ -1,11 +1,11 @@
 import asyncio
 import re
+
 from prompt_toolkit.application import Application
 from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import Completer, Completion
-from prompt_toolkit.filters import completion_is_selected, has_completions
+from prompt_toolkit.filters import Condition, completion_is_selected, has_completions
 from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.layout.menus import CompletionsMenu
@@ -13,12 +13,10 @@ from prompt_toolkit.lexers import Lexer
 from prompt_toolkit.styles import Style
 from prompt_toolkit.widgets import Frame, TextArea
 
-from cleankoda.config import config
 from cleankoda.agent import Agent
 from cleankoda.commands import CommandContext, registry
+from cleankoda.config import config
 from cleankoda.statusline import statusline
-from cleankoda.tools import TOOL_SCHEMAS, get_sandbox_status, sandbox_manager
-
 
 BANNER = """
   ▄▄▄ █  ▄▄▄   ▄▄▄  ▄▄▄▄  █  ▄  ▄▄▄  ▄▄▄█  ▄▄▄
@@ -86,7 +84,7 @@ class SlashCommandCompleter(Completer):
 
 
 class ChatLexer(Lexer):
-    """Lexer that styles Markdown formatting and Rich markup tags (e.g. [yellow]...[/yellow]) in history_area."""
+    """Lexer that styles Markdown formatting and Rich markup tags in history_area."""
 
     def lex_document(self, document):
         lines = document.lines
@@ -100,8 +98,6 @@ class ChatLexer(Lexer):
                 in_code_block[idx] = True
             else:
                 in_code_block[idx] = code
-
-        import re
 
         pattern = re.compile(
             r'(\[(\w+)\b[^\]]*\](.*?)\[/\2\])|'
@@ -272,7 +268,8 @@ class TUI:
         return self._cancel_event
 
     def get_session_status_text(self) -> str:
-        sb_status = get_sandbox_status()
+        tool_registry = self.agent.tool_registry
+        sb_status = tool_registry.get_sandbox_status() if tool_registry else "host"
         return f"Provider: {config.provider} | Model: {config.model} | Temp: {config.temperature} | Sandbox: {sb_status}"
 
     def update_status_line(self) -> None:
@@ -361,7 +358,7 @@ class TUI:
 
     async def stream_response(self, user_text: str) -> None:
         if user_text.startswith("/"):
-            ctx = CommandContext(memory=self.agent.memory, app=self.app)
+            ctx = CommandContext(memory=self.agent.memory, app=self.app, agent=self.agent)
             result = await registry.dispatch_async(user_text, ctx)
             if result.output:
                 self.history_area.text += f"\n\n[System]: {result.output}\n"
@@ -394,7 +391,8 @@ class TUI:
         try:
             asyncio.run(self.app.run_async())
         finally:
-            sandbox_manager.stop()
+            if self.agent.tool_registry:
+                self.agent.tool_registry.stop()
 
 
 def run_tui(agent: Agent) -> None:

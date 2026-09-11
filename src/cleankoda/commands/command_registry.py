@@ -11,6 +11,8 @@ class CommandContext:
     memory: Any
     app: Any | None = None
     state: dict | None = None
+    agent: Any | None = None
+
 
 
 @dataclass

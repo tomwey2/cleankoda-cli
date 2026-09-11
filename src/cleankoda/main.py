@@ -5,12 +5,13 @@ from pathlib import Path
 
 from cleankoda.agent import SYSTEM_PROMPT, Agent
 from cleankoda.commands import CommandContext, registry
+from cleankoda.config import config
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
+from cleankoda.sandbox.config import DEFAULT_IMAGE
 from cleankoda.statusline import statusline
-from cleankoda.tools import TOOL_SCHEMAS, sandbox_manager
+from cleankoda.tools import ToolRegistry
 from cleankoda.tui import run_tui
-from cleankoda.config import config
 
 
 def set_workspace(workspace: Path) -> None:
@@ -51,7 +52,7 @@ def run_headless(
     try:
         # Slash-Command Check
         if prompt_text.startswith("/"):
-            ctx = CommandContext(memory=agent.memory)
+            ctx = CommandContext(memory=agent.memory, agent=agent)
             result = registry.dispatch(prompt_text, ctx)
             if result.output:
                 print(result.output)
@@ -59,7 +60,8 @@ def run_headless(
 
         return asyncio.run(_run_headless_agent(agent, prompt_text))
     finally:
-        sandbox_manager.stop()
+        if agent.tool_registry:
+            agent.tool_registry.stop()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -98,13 +100,19 @@ def main(argv: list[str] | None = None) -> None:
     else:
         set_workspace(Path.cwd())
 
+    tool_registry = ToolRegistry(
+        workspace=config.workspace,
+        sandbox_image=config.sandbox if config.sandbox else DEFAULT_IMAGE,
+    )
+
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
     llm_service = LLMService()
 
     agent = Agent(
         memory=memory,
         llm_service=llm_service,
-        tools=TOOL_SCHEMAS,
+        tool_registry=tool_registry,
+        tools=tool_registry.schemas,
     )
 
     if args.headless or final_prompt is not None:
