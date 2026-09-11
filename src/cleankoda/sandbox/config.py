@@ -8,7 +8,7 @@ class SandboxImageOption:
     description: str  # Kurzbeschreibung für den Auswahldialog
 
 
-DEFAULT_IMAGE = "python:3.11-slim"
+DEFAULT_IMAGE = "host"
 
 AVAILABLE_IMAGES: list[SandboxImageOption] = [
     # --- Python ---

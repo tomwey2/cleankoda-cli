@@ -3,10 +3,10 @@ import os
 from pathlib import Path
 from typing import Any, Dict
 
-from cleankoda.sandbox.base import ExecutionEnvironment
+from cleankoda.sandbox.base_env import ExecutionEnvironment
 
 
-class HostSandbox(ExecutionEnvironment):
+class HostEnvironment(ExecutionEnvironment):
     """Null-Object Implementation: Executes commands directly on the host system in the workspace."""
 
     def __init__(

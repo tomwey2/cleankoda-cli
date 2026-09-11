@@ -1,14 +1,14 @@
 import json
-from cleankoda.sandbox.manager import SandboxManager
 
+from cleankoda.sandbox.sandbox import Sandbox
 
 class BashCommand:
-    """Agenten-Tool zum Ausführen von Shell-Befehlen über einen SandboxManager."""
+    """Agent tool for running shell commands in a sandbox environment."""
 
-    def __init__(self, sandbox_manager: SandboxManager) -> None:
-        self.sandbox_manager = sandbox_manager
+    def __init__(self, sandbox: Sandbox) -> None:
+        self.sandbox = sandbox
 
     async def execute(self, command: str, timeout: int = 30) -> str:
-        """Führt ein Kommando in der aktiven Umgebung aus und liefert ein JSON-Ergebnis."""
-        result = await self.sandbox_manager.current_env.run(command=command, timeout=timeout)
+        """Executes a command in the active environment and returns a JSON result."""
+        result = await self.sandbox.current_env.run(command=command, timeout=timeout)
         return json.dumps(result, ensure_ascii=False)

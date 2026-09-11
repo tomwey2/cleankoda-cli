@@ -1,8 +1,9 @@
 from .bash import BashCommand
-from .tool_registry import TOOL_SCHEMAS, ToolRegistry
+from .filesystem import JailedFilesystem
+from .schemas import TOOL_SCHEMAS
 
 __all__ = [
     "BashCommand",
-    "ToolRegistry",
+    "JailedFilesystem",
     "TOOL_SCHEMAS",
 ]

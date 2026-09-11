@@ -83,8 +83,8 @@ async def select_sandbox_interactive(
     float_container = getattr(app, "float_container", None) if app else None
 
     if app and float_container:
-        tool_registry = getattr(ctx.agent, "tool_registry", None) if ctx else None
-        status = current_status or (tool_registry.get_sandbox_status() if tool_registry else "host")
+        sandbox = getattr(ctx.agent, "sandbox", None) if ctx else None
+        status = current_status or (sandbox.get_status() if sandbox else "host")
         return await _show_tui_modal_sandbox_dialog(app, float_container, status)
 
     return None
@@ -97,9 +97,9 @@ async def select_sandbox_interactive(
 )
 async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
     """Slash-Command Handler für /sandbox."""
-    tool_registry = getattr(ctx.agent, "tool_registry", None) if ctx and ctx.agent else None
-    if not tool_registry:
-        return CommandResult(output="Error: ToolRegistry is not available in command context.")
+    sandbox = getattr(ctx.agent, "sandbox", None) if ctx and ctx.agent else None
+    if not sandbox:
+        return CommandResult(output="Error: Sandbox is not available in command context.")
 
     if args:
         target = args[0].strip()
@@ -109,16 +109,16 @@ async def cmd_sandbox(args: list[str], ctx: CommandContext) -> CommandResult:
             return CommandResult(output="Sandbox-Auswahl abgebrochen.")
 
     if target.lower() in ("off", "host"):
-        msg = await tool_registry.switch_runner(False)
+        msg = await sandbox.switch_runner(False)
         config.sandbox = "host"
         config.save()
     else:
         # Sofort Statuszeile aktualisieren
-        tool_registry.sandbox_manager.is_starting = True
+        sandbox.is_starting = True
         if ctx.app:
             ctx.app.invalidate()
 
-        msg = await tool_registry.switch_runner(True, target)
+        msg = await sandbox.switch_runner(True, target)
         config.sandbox = target
         config.save()
 

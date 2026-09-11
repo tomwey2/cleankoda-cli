@@ -6,10 +6,10 @@ from typing import Any, Dict
 import docker
 from docker.errors import DockerException
 
-from cleankoda.sandbox.base import ExecutionEnvironment
+from cleankoda.sandbox.base_env import ExecutionEnvironment
 
 
-class DockerSandbox(ExecutionEnvironment):
+class DockerEnvironment(ExecutionEnvironment):
     """Isolated Docker execution environment for shell commands."""
 
     def __init__(

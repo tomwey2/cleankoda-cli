@@ -268,8 +268,8 @@ class TUI:
         return self._cancel_event
 
     def get_session_status_text(self) -> str:
-        tool_registry = self.agent.tool_registry
-        sb_status = tool_registry.get_sandbox_status() if tool_registry else "host"
+        sandbox = self.agent.sandbox
+        sb_status = sandbox.get_status() if sandbox else "host"
         return f"Provider: {config.provider} | Model: {config.model} | Temp: {config.temperature} | Sandbox: {sb_status}"
 
     def update_status_line(self) -> None:
@@ -391,8 +391,8 @@ class TUI:
         try:
             asyncio.run(self.app.run_async())
         finally:
-            if self.agent.tool_registry:
-                self.agent.tool_registry.stop()
+            if self.agent.sandbox:
+                self.agent.sandbox.stop()
 
 
 def run_tui(agent: Agent) -> None:

@@ -8,9 +8,10 @@ from cleankoda.commands import CommandContext, registry
 from cleankoda.config import config
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
+from cleankoda.sandbox import Sandbox
 from cleankoda.sandbox.config import DEFAULT_IMAGE
+from cleankoda.tools import TOOL_SCHEMAS
 from cleankoda.statusline import statusline
-from cleankoda.tools import ToolRegistry
 from cleankoda.tui import run_tui
 
 
@@ -60,8 +61,8 @@ def run_headless(
 
         return asyncio.run(_run_headless_agent(agent, prompt_text))
     finally:
-        if agent.tool_registry:
-            agent.tool_registry.stop()
+        if agent.sandbox:
+            agent.sandbox.stop()
 
 
 def main(argv: list[str] | None = None) -> None:
@@ -100,9 +101,9 @@ def main(argv: list[str] | None = None) -> None:
     else:
         set_workspace(Path.cwd())
 
-    tool_registry = ToolRegistry(
+    sandbox = Sandbox(
         workspace=config.workspace,
-        sandbox_image=config.sandbox if config.sandbox else DEFAULT_IMAGE,
+        default_image=config.sandbox if config.sandbox else DEFAULT_IMAGE,
     )
 
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
@@ -111,8 +112,8 @@ def main(argv: list[str] | None = None) -> None:
     agent = Agent(
         memory=memory,
         llm_service=llm_service,
-        tool_registry=tool_registry,
-        tools=tool_registry.schemas,
+        tools=TOOL_SCHEMAS,
+        sandbox=sandbox,
     )
 
     if args.headless or final_prompt is not None:
