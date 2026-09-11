@@ -51,8 +51,9 @@ jobs:
             --onefile \
             --clean \
             --name cleankoda \
+            --paths src \
             --collect-all prompt_toolkit \
-            src/main.py
+            src/cleankoda/main.py
 
       - name: Package Binary into Tarball
         run: |
