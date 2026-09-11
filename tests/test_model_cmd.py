@@ -22,50 +22,35 @@ class TestModelCommand(unittest.TestCase):
 
     def test_model_direct_argument(self):
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = Path(tmpdir) / "cleankoda"
-            config_file = config_dir / "config.json"
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda.config.CONFIG_FILE", config_file
-            ):
-                res = registry.dispatch("/model gpt-4o", ctx)
-                self.assertIn("Model switched to: gpt-4o", res.output)
-                self.assertEqual(AppConfig.load(file_path=config_file).model, "gpt-4o")
+            res = registry.dispatch("/model gpt-4o", ctx)
+            self.assertIn("Model switched to: gpt-4o", res.output)
+            self.assertEqual(AppConfig.load().model, "gpt-4o")
 
     @patch("cleankoda.commands.model.select_model_interactive", new_callable=AsyncMock)
     def test_model_interactive_selection(self, mock_select):
         mock_select.return_value = "claude-3-5-sonnet-latest"
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = Path(tmpdir) / "cleankoda"
-            config_file = config_dir / "config.json"
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda.config.CONFIG_FILE", config_file
-            ):
-                res = registry.dispatch("/model", ctx)
-                self.assertIn("Model switched to: claude-3-5-sonnet-latest", res.output)
-                self.assertEqual(AppConfig.load(file_path=config_file).model, "claude-3-5-sonnet-latest")
-                mock_select.assert_called_once()
+            res = registry.dispatch("/model", ctx)
+            self.assertIn("Model switched to: claude-3-5-sonnet-latest", res.output)
+            self.assertEqual(AppConfig.load().model, "claude-3-5-sonnet-latest")
+            mock_select.assert_called_once()
 
     @patch("cleankoda.commands.model.select_model_interactive", new_callable=AsyncMock)
     def test_model_interactive_cancellation(self, mock_select):
         mock_select.return_value = None  # User pressed ESC
         with tempfile.TemporaryDirectory() as tmpdir:
-            config_dir = Path(tmpdir) / "cleankoda"
-            config_file = config_dir / "config.json"
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             ctx = CommandContext(memory=memory)
 
-            with patch("cleankoda.config.CONFIG_DIR", config_dir), patch(
-                "cleankoda.config.CONFIG_FILE", config_file
-            ):
-                res = registry.dispatch("/model", ctx)
-                self.assertIn("Model selection cancelled.", res.output)
-                mock_select.assert_called_once()
+            res = registry.dispatch("/model", ctx)
+            self.assertIn("Model selection cancelled.", res.output)
+            mock_select.assert_called_once()
 
     def test_show_tui_modal_model_dialog(self):
         from cleankoda.commands.model import _show_tui_modal_model_dialog

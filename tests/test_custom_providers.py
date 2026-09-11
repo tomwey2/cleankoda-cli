@@ -148,8 +148,8 @@ class TestCustomProviders(unittest.TestCase):
                     json.dump(content, f)
 
                 with patch("cleankoda.llm.config.CUSTOM_CONFIG_FILE", custom_path), patch(
-                    "cleankoda.config.CONFIG_FILE", config_path
-                ), patch("cleankoda.llm.credentials.DEFAULT_CREDENTIALS_FILE", cred_path):
+                    "cleankoda.llm.credentials.DEFAULT_CREDENTIALS_FILE", cred_path
+                ):
                     ctx = CommandContext(memory=MagicMock())
                     with patch(
                         "cleankoda.commands.provider.prompt_for_api_key_interactive",
@@ -158,7 +158,7 @@ class TestCustomProviders(unittest.TestCase):
                         res = await cmd_provider(["my_custom"], ctx)
                         self.assertIn("API key updated. Provider switched to: my_custom", res.output)
 
-                        loaded_config = AppConfig.load(file_path=config_path)
+                        loaded_config = AppConfig.load()
                         self.assertEqual(loaded_config.provider, "my_custom")
 
         asyncio.run(_test())

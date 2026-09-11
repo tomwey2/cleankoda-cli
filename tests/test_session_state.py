@@ -6,7 +6,7 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from cleankoda.config import AppConfig
+from cleankoda.config import AppConfig, get_config_file
 from cleankoda.llm import CredentialsStore
 
 
@@ -51,22 +51,21 @@ class TestAppConfig(unittest.TestCase):
                 self.assertEqual(cfg.get_active_api_key(credentials_file=cred_file), "key_in_env")
 
     def test_save_and_load_persistence_and_permissions(self):
-        with tempfile.TemporaryDirectory() as tmpdir:
-            file_path = Path(tmpdir) / "config.json"
-            cfg = AppConfig(provider="anthropic", model="claude-3-5-haiku-latest", temperature=0.5)
-            cfg.save(file_path=file_path)
+        file_path = get_config_file()
+        cfg = AppConfig(provider="anthropic", model="claude-3-5-haiku-latest", temperature=0.5)
+        cfg.save()
 
-            self.assertTrue(file_path.exists())
+        self.assertTrue(file_path.exists())
 
-            # Permissions check 0o600
-            file_stat = file_path.stat()
-            file_mode = stat.S_IMODE(file_stat.st_mode)
-            self.assertEqual(file_mode, 0o600)
+        # Permissions check 0o600
+        file_stat = file_path.stat()
+        file_mode = stat.S_IMODE(file_stat.st_mode)
+        self.assertEqual(file_mode, 0o600)
 
-            loaded_cfg = AppConfig.load(file_path=file_path)
-            self.assertEqual(loaded_cfg.provider, "anthropic")
-            self.assertEqual(loaded_cfg.model, "claude-3-5-haiku-latest")
-            self.assertEqual(loaded_cfg.temperature, 0.5)
+        loaded_cfg = AppConfig.load()
+        self.assertEqual(loaded_cfg.provider, "anthropic")
+        self.assertEqual(loaded_cfg.model, "claude-3-5-haiku-latest")
+        self.assertEqual(loaded_cfg.temperature, 0.5)
 
 
 if __name__ == "__main__":

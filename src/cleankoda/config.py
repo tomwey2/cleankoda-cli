@@ -8,6 +8,12 @@ from cleankoda.llm.credentials import CredentialsStore
 CONFIG_DIR = Path.home() / ".config" / "cleankoda"
 CONFIG_FILE = CONFIG_DIR / "config.json"
 
+def get_config_file() -> Path:
+  if custom_dir := os.getenv("CLEANKODA_CONFIG_DIR"):
+    return Path(custom_dir) / "config.json"
+  return CONFIG_FILE
+
+
 class AppConfig(BaseModel):
     workspace: Path = Path.cwd()
     provider: str = "mistral"
@@ -44,21 +50,21 @@ class AppConfig(BaseModel):
         return f"openai/{model_str}"
 
     @classmethod
-    def load(cls, file_path: Path | None = None) -> "AppConfig":
+    def load(cls) -> "AppConfig":
         """Loads the configuration from the JSON file or creates a new one with defaults."""
-        target_path = file_path or CONFIG_FILE
+        target_path = get_config_file()
         if target_path.is_file():
             content = target_path.read_text(encoding="utf-8")
             return cls.model_validate_json(content)
 
         # If the file does not yet exist: create and save the default object.
         instance = cls()
-        instance.save(target_path)
+        instance.save()
         return instance
 
-    def save(self, file_path: Path | None = None) -> None:
+    def save(self) -> None:
         """Saves the current state back to the JSON file in a formatted manner."""
-        target_path = file_path or CONFIG_FILE
+        target_path = get_config_file()
         target_path.parent.mkdir(parents=True, exist_ok=True)
         json_str = self.model_dump_json(indent=2)
         target_path.write_text(json_str, encoding="utf-8")
