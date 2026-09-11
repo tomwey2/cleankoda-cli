@@ -10,7 +10,7 @@ from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.sandbox import Sandbox
 from cleankoda.sandbox.config import DEFAULT_IMAGE
-from cleankoda.tools import TOOL_SCHEMAS
+from cleankoda.tools import Tools
 from cleankoda.statusline import statusline
 from cleankoda.tui import run_tui
 
@@ -107,13 +107,11 @@ def main(argv: list[str] | None = None) -> None:
     )
 
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
-    llm_service = LLMService()
 
     agent = Agent(
         memory=memory,
-        llm_service=llm_service,
-        tools=TOOL_SCHEMAS,
-        sandbox=sandbox,
+        llm_service=LLMService(),
+        tools=Tools(sandbox=sandbox),
     )
 
     if args.headless or final_prompt is not None:

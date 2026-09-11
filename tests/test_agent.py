@@ -9,7 +9,7 @@ from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.sandbox import Sandbox
 from cleankoda.statusline import statusline
-from cleankoda.tools import TOOL_SCHEMAS
+from cleankoda.tools import TOOL_SCHEMAS, Tools
 
 
 class TestAgentLoop(unittest.TestCase):
@@ -18,16 +18,15 @@ class TestAgentLoop(unittest.TestCase):
         mem = Memory(system_prompt="Test")
         ls = LLMService()
         sb = Sandbox(workspace=Path.cwd(), default_image=None)
+        tools = Tools(sandbox=sb)
         agent = Agent(
             memory=mem,
             llm_service=ls,
-            sandbox=sb,
-            tools=sb.schemas,
+            tools=tools,
         )
         self.assertEqual(agent.memory, mem)
         self.assertEqual(agent.llm_service, ls)
-        self.assertEqual(agent.sandbox, sb)
-        self.assertEqual(agent.tools, TOOL_SCHEMAS)
+        self.assertEqual(agent.tools, tools)
 
     def test_run_agent_basic_completion(self):
         async def _test():
@@ -53,7 +52,8 @@ class TestAgentLoop(unittest.TestCase):
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
                 sb = Sandbox(workspace=Path.cwd(), default_image=None)
-                agent = Agent(memory=mem, llm_service=LLMService(), sandbox=sb, tools=sb.schemas)
+                tools = Tools(sandbox=sb)
+                agent = Agent(memory=mem, llm_service=LLMService(), tools=tools)
                 async for token in agent.run():
                     tokens.append(token)
 
@@ -77,12 +77,12 @@ class TestAgentLoop(unittest.TestCase):
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
                 sb = MagicMock()
-                sb.schemas = [{"type": "function", "function": {"name": "custom_tool"}}]
+                tools = MagicMock()
+                tools.get_schemas.return_value = [{"type": "function", "function": {"name": "custom_tool"}}]
                 agent = Agent(
                     memory=mem,
                     llm_service=LLMService(),
-                    sandbox=sb,
-                    tools=sb.schemas,
+                    tools=tools,
                 )
                 async for token in agent.run(cancel_event=cancel_event):
                     tokens.append(token)
@@ -146,8 +146,9 @@ class TestAgentLoop(unittest.TestCase):
                     yield "Done."
 
             mock_sandbox = MagicMock()
-            mock_sandbox.schemas = TOOL_SCHEMAS
-            mock_sandbox.run_tool = AsyncMock(return_value="file1.txt")
+            mock_tools = MagicMock()
+            mock_tools.get_schemas.return_value = TOOL_SCHEMAS
+            mock_tools.run_tool = AsyncMock(return_value="file1.txt")
 
             statusline.on_change = status_cb
             try:
@@ -156,8 +157,7 @@ class TestAgentLoop(unittest.TestCase):
                     agent = Agent(
                         memory=mem,
                         llm_service=LLMService(),
-                        sandbox=mock_sandbox,
-                        tools=mock_sandbox.schemas,
+                        tools=mock_tools,
                     )
                     async for token in agent.run():
                         tokens.append(token)

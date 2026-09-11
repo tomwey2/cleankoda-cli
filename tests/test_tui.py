@@ -109,12 +109,13 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
         from unittest.mock import MagicMock
         from cleankoda.agent import Agent
         from cleankoda.llm import LLMService
-        from cleankoda.tools import TOOL_SCHEMAS
+        from cleankoda.tools import Tools
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
         sb = Sandbox(workspace=Path.cwd(), default_image=None)
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS, sandbox=sb)
+        tools = Tools(sandbox=sb)
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
         tui.input_field.text = "/model"
 
@@ -127,12 +128,13 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
         from unittest.mock import MagicMock
         from cleankoda.agent import Agent
         from cleankoda.llm import LLMService
-        from cleankoda.tools import TOOL_SCHEMAS
+        from cleankoda.tools import Tools
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
         sb = Sandbox(workspace=Path.cwd(), default_image=None)
-        agent = Agent(memory=memory, llm_service=LLMService(), sandbox=sb, tools=TOOL_SCHEMAS)
+        tools = Tools(sandbox=sb)
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
         tui.input_field.text = "Hello world"
 
@@ -153,7 +155,7 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         from prompt_toolkit.completion import Completion
         from cleankoda.agent import Agent
         from cleankoda.llm import LLMService
-        from cleankoda.tools import TOOL_SCHEMAS
+        from cleankoda.tools import Tools
         from cleankoda.tui import TUI
 
         mock_app = MagicMock()
@@ -165,7 +167,8 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
 
         memory = Memory(system_prompt="Test")
         sb = Sandbox(workspace=Path.cwd(), default_image=None)
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS, sandbox=sb)
+        tools = Tools(sandbox=sb)
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
         tui.input_field.text = "/m"
         tui.input_field.buffer.cursor_position = 2
@@ -193,12 +196,13 @@ class TestTUIStatusManager(unittest.TestCase):
         from cleankoda.llm import LLMService
         from cleankoda.memory import Memory
         from cleankoda.statusline import statusline
-        from cleankoda.tools import TOOL_SCHEMAS
+        from cleankoda.tools import Tools
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
         sb = Sandbox(workspace=Path.cwd(), default_image=None)
-        agent = Agent(memory=memory, llm_service=LLMService(), tools=TOOL_SCHEMAS, sandbox=sb)
+        tools = Tools(sandbox=sb)
+        agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
         statusline.on_change = tui.on_status_changed
         mock_app = MagicMock()

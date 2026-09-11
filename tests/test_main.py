@@ -9,6 +9,7 @@ from cleankoda.llm import LLMService
 from cleankoda.main import main, run_headless
 from cleankoda.memory import Memory
 from cleankoda.sandbox import Sandbox
+from cleankoda.tools import Tools
 
 
 class TestMainDualMode(unittest.TestCase):
@@ -19,11 +20,11 @@ class TestMainDualMode(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             sb = Sandbox(workspace=Path(tmpdir), default_image=None)
+            tools = Tools(sandbox=sb)
             agent = Agent(
                 memory=mem,
                 llm_service=LLMService(),
-                tools=sb.schemas,
-                sandbox=sb,
+                tools=tools,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -44,11 +45,11 @@ class TestMainDualMode(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             sb = Sandbox(workspace=Path(tmpdir), default_image=None)
+            tools = Tools(sandbox=sb)
             agent = Agent(
                 memory=mem,
                 llm_service=LLMService(),
-                tools=sb.schemas,
-                sandbox=sb,
+                tools=tools,
             )
             captured_output = io.StringIO()
             with patch("sys.stdout", captured_output):
@@ -88,7 +89,8 @@ class TestMainDualMode(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmpdir:
             mem = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
             sb = Sandbox(workspace=Path(tmpdir), default_image=None)
-            agent = Agent(memory=mem, llm_service=LLMService(), tools=sb.schemas, sandbox=sb)
+            tools = Tools(sandbox=sb)
+            agent = Agent(memory=mem, llm_service=LLMService(), tools=tools)
             tui = TUI(agent)
             tui.update_status_line()
             lines = tui.status_line.text.splitlines()

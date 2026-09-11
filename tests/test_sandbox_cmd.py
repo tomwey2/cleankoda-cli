@@ -13,6 +13,7 @@ from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
 from cleankoda.sandbox import AVAILABLE_IMAGES, Sandbox
+from cleankoda.tools import Tools
 from cleankoda.tui import SlashCommandCompleter
 
 
@@ -20,11 +21,11 @@ class TestSandboxCommand(unittest.TestCase):
 
     def setUp(self):
         self.sandbox = Sandbox(workspace=Path.cwd(), default_image=None)
+        self.tools = Tools(sandbox=self.sandbox)
         self.agent = Agent(
             memory=Memory(system_prompt="Test"),
             llm_service=LLMService(),
-            tools=self.sandbox.schemas,
-            sandbox=self.sandbox,
+            tools=self.tools,
         )
 
     def test_sandbox_command_registered(self):

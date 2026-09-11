@@ -1,19 +1,14 @@
-import json
 from pathlib import Path
-from typing import Any, Callable
 
 from cleankoda.sandbox.base_env import ExecutionEnvironment
 from cleankoda.sandbox.config import DEFAULT_IMAGE
 from cleankoda.sandbox.docker_env import DockerEnvironment
 from cleankoda.sandbox.host_env import HostEnvironment
 from cleankoda.statusline import statusline
-from cleankoda.tools.bash import BashCommand
-from cleankoda.tools.filesystem import JailedFilesystem
-from cleankoda.tools.schemas import TOOL_SCHEMAS
 
 
 class Sandbox:
-    """Manages workspace execution environment lifecycle (host/docker) and tools."""
+    """Manages workspace execution environment lifecycle (host/docker)."""
 
     def __init__(
         self,
@@ -27,17 +22,6 @@ class Sandbox:
         self.current_env: ExecutionEnvironment = HostEnvironment(self.workspace)
         if default_image and default_image != "host":
             self.current_env = DockerEnvironment(self.workspace, image=default_image)
-
-        self.fs = JailedFilesystem(workspace_root=self.workspace)
-        self.bash_tool = BashCommand(sandbox=self)
-
-        self._tools: dict[str, Callable[..., Any]] = {
-            "read_file": self.fs.read_file,
-            "write_file": self.fs.write_file,
-            "list_dir": self.fs.list_dir,
-            "run_bash": self.bash_tool.execute,
-        }
-        self.schemas = TOOL_SCHEMAS
 
     async def switch_environment(self, image: str | None) -> str:
         """Stops the active environment and asynchronously switches to host or docker image."""
@@ -93,33 +77,3 @@ class Sandbox:
     def stop(self) -> None:
         """Cleanly shuts down active execution environment."""
         self.current_env.stop()
-
-    async def run_tool(self, tool_call: Any) -> str:
-        """Executes a tool call using the tools managed by this sandbox."""
-        func = getattr(tool_call, "function", None)
-        if func:
-            name = getattr(func, "name", None) or (func.get("name") if isinstance(func, dict) else None)
-            args_str = getattr(func, "arguments", "{}") or (func.get("arguments") if isinstance(func, dict) else "{}")
-        elif isinstance(tool_call, dict):
-            fn_dict = tool_call.get("function", {})
-            name = fn_dict.get("name")
-            args_str = fn_dict.get("arguments", "{}")
-        else:
-            name = None
-            args_str = "{}"
-
-        if isinstance(args_str, str):
-            try:
-                args = json.loads(args_str) if args_str else {}
-            except json.JSONDecodeError:
-                args = {}
-        else:
-            args = args_str or {}
-
-        if not name or name not in self._tools:
-            return f"Error: Tool '{name}' not found."
-
-        try:
-            return await self._tools[name](**args)
-        except Exception as error:
-            return f"Error: {error}"
