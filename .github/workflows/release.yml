@@ -19,9 +19,6 @@ jobs:
           - os: ubuntu-latest
             target_os: linux
             arch: x86_64
-          - os: macos-13
-            target_os: darwin
-            arch: x86_64
           - os: macos-latest
             target_os: darwin
             arch: arm64
@@ -70,18 +67,26 @@ jobs:
           path: cleankoda-${{ matrix.target_os }}-${{ matrix.arch }}.tar.gz
 
   release:
-    name: Publish to GitHub Release
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: ./artifacts
-          merge-multiple: true
+      name: Publish to GitHub Release
+      needs: build
+      runs-on: ubuntu-latest
+      permissions:
+        contents: write
+      steps:
+        - name: Download all artifacts
+          uses: actions/download-artifact@v4
+          with:
+            pattern: binary-*
+            path: ./artifacts
+            merge-multiple: true
 
-      - name: Create GitHub Release and Upload Assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: ./artifacts/*.tar.gz
-          generate_release_notes: true
+        - name: Inspect downloaded files
+          run: |
+            echo "=== Gefundene Dateien in ./artifacts ==="
+            ls -la ./artifacts
+
+        - name: Create GitHub Release and Upload Assets
+          uses: softprops/action-gh-release@v2
+          with:
+            files: ./artifacts/*.tar.gz
+            generate_release_notes: true
