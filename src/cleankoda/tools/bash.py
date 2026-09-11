@@ -1,11 +1,14 @@
 import json
+from typing import TYPE_CHECKING
 
-from cleankoda.sandbox.sandbox import Sandbox
+if TYPE_CHECKING:
+    from cleankoda.sandbox.sandbox import Sandbox
+
 
 class BashCommand:
     """Agent tool for running shell commands in a sandbox environment."""
 
-    def __init__(self, sandbox: Sandbox) -> None:
+    def __init__(self, sandbox: "Sandbox") -> None:
         self.sandbox = sandbox
 
     async def execute(self, command: str, timeout: int = 30) -> str:

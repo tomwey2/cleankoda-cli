@@ -12,20 +12,19 @@ from cleankoda.agent import Agent
 from cleankoda.commands import CommandContext, registry
 from cleankoda.llm import LLMService
 from cleankoda.memory import Memory
-from cleankoda.sandbox import AVAILABLE_IMAGES
-from cleankoda.tools import ToolRegistry
+from cleankoda.sandbox import AVAILABLE_IMAGES, Sandbox
 from cleankoda.tui import SlashCommandCompleter
 
 
 class TestSandboxCommand(unittest.TestCase):
 
     def setUp(self):
-        self.tool_registry = ToolRegistry(workspace=Path.cwd(), sandbox_image=None)
+        self.sandbox = Sandbox(workspace=Path.cwd(), default_image=None)
         self.agent = Agent(
             memory=Memory(system_prompt="Test"),
             llm_service=LLMService(),
-            tool_registry=self.tool_registry,
-            tools=self.tool_registry.schemas,
+            tools=self.sandbox.schemas,
+            sandbox=self.sandbox,
         )
 
     def test_sandbox_command_registered(self):
@@ -34,13 +33,13 @@ class TestSandboxCommand(unittest.TestCase):
         self.assertIn("sandbox", cmd_names)
 
     def test_sandbox_off_direct(self):
-        asyncio.run(self.tool_registry.switch_runner(use_sandbox_param=False))
+        asyncio.run(self.sandbox.switch_runner(use_sandbox_param=False))
         ctx = CommandContext(memory=self.agent.memory, agent=self.agent)
         res = registry.dispatch("/sandbox off", ctx)
         self.assertIn("Sandbox disabled", res.output)
-        self.assertEqual(self.tool_registry.get_sandbox_status(), "host")
+        self.assertEqual(self.sandbox.get_status(), "host")
 
-    @patch("cleankoda.sandbox.manager.DockerSandbox")
+    @patch("cleankoda.sandbox.sandbox.DockerEnvironment")
     def test_sandbox_image_direct(self, mock_docker_sandbox):
         mock_instance = MagicMock()
         mock_instance.image = "node:20-slim"
@@ -50,10 +49,10 @@ class TestSandboxCommand(unittest.TestCase):
         ctx = CommandContext(memory=self.agent.memory, agent=self.agent)
         res = registry.dispatch("/sandbox node:20-slim", ctx)
         self.assertIn("Sandbox enabled: Image [node:20-slim]", res.output)
-        self.assertEqual(self.tool_registry.get_sandbox_status(), "node:20-slim")
+        self.assertEqual(self.sandbox.get_status(), "node:20-slim")
         mock_instance.start_async.assert_awaited_once()
 
-    @patch("cleankoda.sandbox.manager.DockerSandbox")
+    @patch("cleankoda.sandbox.sandbox.DockerEnvironment")
     def test_sandbox_docker_error_fallback(self, mock_docker_sandbox):
         mock_instance = MagicMock()
         mock_instance.start_async = AsyncMock(side_effect=RuntimeError("Docker daemon not reachable"))
@@ -63,7 +62,7 @@ class TestSandboxCommand(unittest.TestCase):
         res = registry.dispatch("/sandbox python:3.12-slim", ctx)
         self.assertIn("Error starting sandbox", res.output)
         self.assertIn("Fallback to host system", res.output)
-        self.assertEqual(self.tool_registry.get_sandbox_status(), "host")
+        self.assertEqual(self.sandbox.get_status(), "host")
 
     def test_sandbox_interactive_selection_in_tui(self):
         from cleankoda.commands.sandbox import _show_tui_modal_sandbox_dialog

@@ -144,13 +144,13 @@ class TestLLMService(unittest.TestCase):
 
             from cleankoda.tools import TOOL_SCHEMAS
 
-            mock_tool_registry = MagicMock()
-            mock_tool_registry.schemas = TOOL_SCHEMAS
-            mock_tool_registry.run_tool = AsyncMock(return_value="file1.txt\nfile2.txt")
+            mock_sandbox = MagicMock()
+            mock_sandbox.schemas = TOOL_SCHEMAS
+            mock_sandbox.run_tool = AsyncMock(return_value="file1.txt\nfile2.txt")
 
             with patch("litellm.acompletion", side_effect=mock_acompletion):
                 chunks = []
-                agent = Agent(memory=mem, llm_service=LLMService(), tool_registry=mock_tool_registry, tools=mock_tool_registry.schemas)
+                agent = Agent(memory=mem, llm_service=LLMService(), sandbox=mock_sandbox, tools=mock_sandbox.schemas)
                 async for token in agent.run():
                     chunks.append(token)
 
@@ -158,7 +158,7 @@ class TestLLMService(unittest.TestCase):
                 self.assertIn("list_files(.)", output)
                 self.assertNotIn("Tool Output", output)
                 self.assertIn("Done listing files.", output)
-                mock_tool_registry.run_tool.assert_called_once()
+                mock_sandbox.run_tool.assert_called_once()
                 self.assertEqual(call_count, 2)
 
         asyncio.run(_test())
