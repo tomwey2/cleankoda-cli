@@ -203,13 +203,13 @@ class TestTUIStatusManager(unittest.TestCase):
         # Setting status via statusline automatically updates status line
         try:
             statusline.set("sandbox", "Sandbox: Startet (docker:latest)...")
-            self.assertIn("▶ Sandbox: Startet (docker:latest)...", tui.status_line.text)
+            self.assertIn("Sandbox: Startet (docker:latest)...", tui.status_line.text)
             mock_app.invalidate.assert_called()
 
             # Multiple slots are combined
             statusline.set("llm", "LLM Cold Start: Versuch 1/10 (10s gewartet)")
             self.assertIn(
-                "▶ Sandbox: Startet (docker:latest)... | LLM Cold Start: Versuch 1/10 (10s gewartet)",
+                "Sandbox: Startet (docker:latest)... | LLM Cold Start: Versuch 1/10 (10s gewartet)",
                 tui.status_line.text,
             )
 

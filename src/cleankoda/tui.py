@@ -5,6 +5,7 @@ from prompt_toolkit.auto_suggest import AutoSuggestFromHistory
 from prompt_toolkit.completion import Completer, Completion
 from prompt_toolkit.filters import completion_is_selected, has_completions
 from prompt_toolkit.key_binding import KeyBindings
+from prompt_toolkit.filters import Condition
 from prompt_toolkit.layout.containers import Float, FloatContainer, HSplit
 from prompt_toolkit.layout.layout import Layout
 from prompt_toolkit.layout.menus import CompletionsMenu
@@ -289,7 +290,7 @@ class TUI:
             active_status = statusline.get_combined_status()
             self.status_line.window.height = 2
             if active_status:
-                self.status_line.text = f"{session_text}\n▶ {active_status}"
+                self.status_line.text = f"{session_text}\n{active_status}"
             else:
                 self.status_line.text = f"{session_text}\nCtrl+O for shortcuts"
 
@@ -299,6 +300,10 @@ class TUI:
         def _exit(event):
             event.app.exit()
 
+        @Condition
+        def is_input_allowed() -> bool:
+            return self.agent.is_busy()
+
         @self.kb.add("c-o", eager=True)
         def _show_shortcuts(event):
             self.showing_shortcuts = True
@@ -306,7 +311,7 @@ class TUI:
             self.update_status_line()
             event.app.invalidate()
 
-        @self.kb.add("escape", eager=True)
+        @self.kb.add("escape", eager=True, filter=~is_input_allowed)
         def _handle_escape(event):
             if self.is_processing:
                 self.cancel_event.set()
@@ -318,7 +323,7 @@ class TUI:
             self.update_status_line()
             event.app.invalidate()
 
-        @self.kb.add("enter", filter=has_completions | completion_is_selected)
+        @self.kb.add("enter", filter=(has_completions | completion_is_selected) & is_input_allowed)
         def _accept_completion(event):
             buff = event.current_buffer
             if buff.complete_state:

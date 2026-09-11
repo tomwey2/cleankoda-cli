@@ -172,7 +172,7 @@ class LLMService:
         while True:
             try:
                 # Initiate streaming completion via LiteLLM (`acompletion` returns an async generator of stream chunks)
-                statusline.set("llm", "call llm")
+                # statusline.set("llm", "call llm")
                 response = await litellm.acompletion(**kwargs)
 
                 # Iterate through incoming streaming chunks as they arrive from the LLM provider
@@ -202,23 +202,19 @@ class LLMService:
                     if content:
                         # Notify user if model succeeded after a cold start retry
                         if attempt > 0 and not model_ready_notified:
-                            statusline.clear("llm")
                             yield "[green]✔ Model ready.[/green]\n"
                             model_ready_notified = True
 
                         # Yield content token immediately to stream it live to UI / CLI
                         yield content
 
-                statusline.clear("llm")
                 break
 
             # --- Step 3: Error Handling & Cold Start Retries ---
             except AuthenticationError as e:
-                statusline.clear("llm")
                 yield f"[Authentication Error ({config.provider}): Please check your API key. Details: {e}]"
                 return
             except RateLimitError as e:
-                statusline.clear("llm")
                 yield f"[Rate Limit Exceeded ({config.provider}): {e}]"
                 return
             except (ServiceUnavailableError, APIConnectionError, APIError) as e:
@@ -243,6 +239,7 @@ class LLMService:
                         yield f"[LLM Error ({config.provider}): {e}]"
                     return
             except Exception as e:
-                statusline.clear("llm")
                 yield f"[Unexpected Error ({config.provider}): {type(e).__name__} - {e}]"
                 return
+            finally:
+                statusline.clear("llm")

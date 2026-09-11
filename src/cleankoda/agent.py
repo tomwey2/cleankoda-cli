@@ -1,5 +1,6 @@
 import asyncio
 from typing import Any, AsyncGenerator
+from enum import Enum, auto
 
 from litellm import stream_chunk_builder
 
@@ -12,6 +13,13 @@ SYSTEM_PROMPT = """You are a coding agent running in the user's terminal.
 You can list files, read files, write files, and run shell commands.
 Use your tools to complete the user's task, then briefly summarize what you did.
 The working directory is the folder the user launched you from."""
+
+class AgentLifecycle(Enum):
+  IDLE = auto()
+  THINKING = auto()
+  EXECUTING = auto()
+  AWAITING_CONFIRMATION = auto()
+  ERROR = auto()
 
 
 class Agent:
@@ -26,6 +34,7 @@ class Agent:
         self.memory = memory
         self.llm_service = llm_service
         self.tools = tools
+        self.state =AgentLifecycle.IDLE
 
     async def run(
         self,
@@ -36,8 +45,11 @@ class Agent:
         iteration = 0
 
         while iteration < max_tool_iterations:
+            self._set_state(AgentLifecycle.THINKING)
+
             if cancel_event is not None and cancel_event.is_set():
                 yield "[yellow]Agent execution cancelled.[/yellow]\n"
+                self._set_state(AgentLifecycle.IDLE)
                 return
 
             iteration += 1
@@ -52,6 +64,7 @@ class Agent:
                 yield chunk
 
             if cancel_event is not None and cancel_event.is_set():
+                self._set_state(AgentLifecycle.IDLE)
                 return
 
             if not chunks:
@@ -93,6 +106,7 @@ class Agent:
             for tool_call in tool_calls:
                 if cancel_event is not None and cancel_event.is_set():
                     yield "[yellow]Tool execution cancelled.[/yellow]\n"
+                    self._set_state(AgentLifecycle.IDLE)
                     return
 
                 func = getattr(tool_call, "function", None)
@@ -103,12 +117,11 @@ class Agent:
                 display_str = self.llm_service.format_tool_call_display(func_name, func_args)
                 yield f"{display_str}\n"
 
-                statusline.set("tool", f"Execute tool: {func_name}...")
-
                 try:
+                    self._set_state(AgentLifecycle.EXECUTING, f"Execute tool: {func_name}...")
                     tool_result = await run_tool(tool_call)
                 finally:
-                    statusline.clear("tool")
+                    self._set_state(AgentLifecycle.THINKING)
 
                 tool_msg = {
                     "role": "tool",
@@ -116,3 +129,18 @@ class Agent:
                     "content": tool_result,
                 }
                 self.memory.add_message(tool_msg)
+        statusline.clear("agent")
+
+
+    def is_busy(self) -> bool:
+        """Convenient lookup for TUI keybindings and input locks."""
+        return self.state in (
+            AgentLifecycle.THINKING,
+            AgentLifecycle.EXECUTING,
+            AgentLifecycle.AWAITING_CONFIRMATION,
+        )
+
+    def _set_state(self, new_state: AgentLifecycle, detail: str | None = None) -> None:
+        self.state = new_state
+        msg = f"[{new_state.name}] {detail}" if detail else new_state.name
+        statusline.set("agent", msg)
