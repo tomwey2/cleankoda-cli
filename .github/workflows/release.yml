@@ -1,0 +1,86 @@
+name: Release Standalone Binaries
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build on ${{ matrix.os }} (${{ matrix.arch }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target_os: linux
+            arch: x86_64
+          - os: macos-13
+            target_os: darwin
+            arch: x86_64
+          - os: macos-latest
+            target_os: darwin
+            arch: arm64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          version: "latest"
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.11
+
+      - name: Install project dependencies & PyInstaller
+        run: |
+          uv sync --frozen
+          uv add --dev pyinstaller
+
+      - name: Build Standalone Binary with PyInstaller
+        run: |
+          # Baut ein Onefile-Executable aus src/main.py
+          uv run pyinstaller \
+            --onefile \
+            --clean \
+            --name cleankoda \
+            --collect-all prompt_toolkit \
+            src/main.py
+
+      - name: Package Binary into Tarball
+        run: |
+          mkdir -p release-dist
+          cp dist/cleankoda release-dist/
+          cd release-dist
+          tar -czf "../cleankoda-${{ matrix.target_os }}-${{ matrix.arch }}.tar.gz" cleankoda
+          cd ..
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: binary-${{ matrix.target_os }}-${{ matrix.arch }}
+          path: cleankoda-${{ matrix.target_os }}-${{ matrix.arch }}.tar.gz
+
+  release:
+    name: Publish to GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release and Upload Assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ./artifacts/*.tar.gz
+          generate_release_notes: true
