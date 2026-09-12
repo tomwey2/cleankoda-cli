@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 from cleankoda.commands import CommandContext
-from cleankoda.commands.provider import cmd_provider
+from cleankoda.commands.cmd_provider import cmd_provider
 from cleankoda.config import AppConfig, config
 from cleankoda.llm.config import (
     ProviderConfig,
@@ -152,7 +152,7 @@ class TestCustomProviders(unittest.TestCase):
                 ):
                     ctx = CommandContext(memory=MagicMock())
                     with patch(
-                        "cleankoda.commands.provider.prompt_for_api_key_interactive",
+                        "cleankoda.commands.cmd_provider.prompt_for_api_key_interactive",
                         return_value="secret-custom-key",
                     ):
                         res = await cmd_provider(["my_custom"], ctx)

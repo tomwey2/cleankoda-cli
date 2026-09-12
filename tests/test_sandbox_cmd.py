@@ -65,7 +65,7 @@ class TestSandboxCommand(unittest.TestCase):
         self.assertEqual(self.sandbox.get_sandbox_image().id, "host")
 
     def test_sandbox_interactive_selection_in_tui(self):
-        from cleankoda.commands.sandbox import _show_tui_modal_sandbox_dialog
+        from cleankoda.commands.cmd_sandbox import _show_tui_modal_sandbox_dialog
 
         float_container = FloatContainer(content=Window(), floats=[])
         layout = Layout(float_container)

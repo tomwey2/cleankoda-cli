@@ -49,10 +49,10 @@ class Sandbox:
             self.current_env = HostEnvironment(self.workspace)
             return "Sandbox disabled: Commands run directly on the host."
 
-    async def switch_runner(self, use_sandbox_param: bool, image: str | None = None) -> str:
+    async def switch_runner(self, use_sandbox_param: bool, image_id: str | None = None) -> str:
         """Safely switch environment in sandbox."""
-        if use_sandbox_param and image and image != "host":
-            return await self.switch_environment(image)
+        if use_sandbox_param and image_id and image_id != "host":
+            return await self.switch_environment(image_id)
         else:
             return await self.switch_environment("host")
 
@@ -63,9 +63,8 @@ class Sandbox:
     async def toggle_sandbox(self, enabled: bool) -> str:
         """Toggles sandbox execution environment on or off."""
         if enabled:
-            current_status = self.get_status()
-            image = current_status if current_status not in ("host", "Starting...") else DEFAULT_IMAGE
-            return await self.switch_runner(True, image)
+            image_id = self.get_sandbox_image().id
+            return await self.switch_runner(True, image_id)
         else:
             return await self.switch_runner(False)
 

@@ -21,7 +21,7 @@ class TestProviderCommand(unittest.TestCase):
         cmd_names = {c.name for c in cmds}
         self.assertIn("provider", cmd_names)
 
-    @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
     def test_provider_direct_argument_valid_ollama(self, mock_prompt_key):
         with tempfile.TemporaryDirectory() as tmpdir:
             memory = Memory(system_prompt="Test", file=Path(tmpdir) / "mem.json")
@@ -32,7 +32,7 @@ class TestProviderCommand(unittest.TestCase):
             self.assertEqual(AppConfig.load().provider, "ollama")
             mock_prompt_key.assert_not_called()
 
-    @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
     def test_provider_direct_argument_with_key_prompt(self, mock_prompt_key):
         mock_prompt_key.return_value = "sk-new-openai-key"
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -56,8 +56,8 @@ class TestProviderCommand(unittest.TestCase):
             self.assertIn("Available providers:", res.output)
             self.assertFalse(get_config_file().exists())
 
-    @patch("cleankoda.commands.provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
-    @patch("cleankoda.commands.provider.select_provider_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_provider.prompt_for_api_key_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_provider.select_provider_interactive", new_callable=AsyncMock)
     def test_provider_interactive_selection(self, mock_select, mock_prompt_key):
         mock_select.return_value = "anthropic"
         mock_prompt_key.return_value = "sk-anthropic-123"
@@ -74,7 +74,7 @@ class TestProviderCommand(unittest.TestCase):
                 mock_select.assert_called_once()
                 mock_prompt_key.assert_called_once()
 
-    @patch("cleankoda.commands.provider.select_provider_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_provider.select_provider_interactive", new_callable=AsyncMock)
     def test_provider_interactive_cancellation(self, mock_select):
         mock_select.return_value = None  # User pressed ESC
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -87,7 +87,7 @@ class TestProviderCommand(unittest.TestCase):
             mock_select.assert_called_once()
 
     def test_show_tui_modal_provider_dialog(self):
-        from cleankoda.commands.provider import _show_tui_modal_provider_dialog
+        from cleankoda.commands.cmd_provider import _show_tui_modal_provider_dialog
 
         float_container = FloatContainer(content=Window(), floats=[])
         layout = Layout(float_container)
@@ -110,7 +110,7 @@ class TestProviderCommand(unittest.TestCase):
         asyncio.run(_test())
 
     def test_show_tui_modal_api_key_dialog(self):
-        from cleankoda.commands.provider import _show_tui_modal_api_key_dialog
+        from cleankoda.commands.cmd_provider import _show_tui_modal_api_key_dialog
 
         float_container = FloatContainer(content=Window(), floats=[])
         layout = Layout(float_container)

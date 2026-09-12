@@ -29,7 +29,7 @@ class TestModelCommand(unittest.TestCase):
             self.assertIn("Model switched to: gpt-4o", res.output)
             self.assertEqual(AppConfig.load().model, "gpt-4o")
 
-    @patch("cleankoda.commands.model.select_model_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_model.select_model_interactive", new_callable=AsyncMock)
     def test_model_interactive_selection(self, mock_select):
         mock_select.return_value = "claude-3-5-sonnet-latest"
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -41,7 +41,7 @@ class TestModelCommand(unittest.TestCase):
             self.assertEqual(AppConfig.load().model, "claude-3-5-sonnet-latest")
             mock_select.assert_called_once()
 
-    @patch("cleankoda.commands.model.select_model_interactive", new_callable=AsyncMock)
+    @patch("cleankoda.commands.cmd_model.select_model_interactive", new_callable=AsyncMock)
     def test_model_interactive_cancellation(self, mock_select):
         mock_select.return_value = None  # User pressed ESC
         with tempfile.TemporaryDirectory() as tmpdir:
@@ -53,7 +53,7 @@ class TestModelCommand(unittest.TestCase):
             mock_select.assert_called_once()
 
     def test_show_tui_modal_model_dialog(self):
-        from cleankoda.commands.model import _show_tui_modal_model_dialog
+        from cleankoda.commands.cmd_model import _show_tui_modal_model_dialog
 
         float_container = FloatContainer(content=Window(), floats=[])
         layout = Layout(float_container)

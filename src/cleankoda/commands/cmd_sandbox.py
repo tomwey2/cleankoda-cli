@@ -84,7 +84,7 @@ async def select_sandbox_interactive(
 
     if app and float_container:
         sandbox = getattr(ctx.agent, "sandbox", None) if ctx else None
-        status = current_status or (sandbox.get_status() if sandbox else "host")
+        status = current_status or (sandbox.get_sandbox_image().id if sandbox else "host")
         return await _show_tui_modal_sandbox_dialog(app, float_container, status)
 
     return None
