@@ -2,11 +2,13 @@ from abc import ABC, abstractmethod
 from pathlib import Path
 from typing import Any
 
+from cleankoda.sandbox.config import SandboxImageOption, get_standbox_image
 
 class ExecutionEnvironment(ABC):
     """Abstract base class for execution environments (host & sandbox)."""
 
-    def __init__(self, workspace_path: Path, max_output_chars: int = 12000) -> None:
+    def __init__(self, image_id: str, workspace_path: Path, max_output_chars: int = 12000) -> None:
+        self.image: SandboxImageOption = get_standbox_image(image_id)
         self.workspace_path = workspace_path.resolve()
         self.max_output_chars = max_output_chars
 

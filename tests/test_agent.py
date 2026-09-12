@@ -17,7 +17,7 @@ class TestAgentLoop(unittest.TestCase):
     def test_agent_class_instantiation(self):
         mem = Memory(system_prompt="Test")
         ls = LLMService()
-        sb = Sandbox(workspace=Path.cwd(), default_image=None)
+        sb = Sandbox(default_image_id=None, workspace=Path.cwd())
         tools = Tools(sandbox=sb)
         agent = Agent(
             memory=mem,
@@ -51,7 +51,7 @@ class TestAgentLoop(unittest.TestCase):
 
             with patch("cleankoda.agent.LLMService.stream_completion", side_effect=mock_stream_llm):
                 tokens = []
-                sb = Sandbox(workspace=Path.cwd(), default_image=None)
+                sb = Sandbox(default_image_id=None, workspace=Path.cwd())
                 tools = Tools(sandbox=sb)
                 agent = Agent(memory=mem, llm_service=LLMService(), tools=tools)
                 async for token in agent.run():

@@ -10,7 +10,7 @@ class TestSandboxClass(unittest.TestCase):
     def test_sandbox_workspace_binding(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             ws_path = Path(tmpdir).resolve()
-            sandbox = Sandbox(workspace=ws_path, default_image=None)
+            sandbox = Sandbox(default_image_id=None, workspace=ws_path)
 
             self.assertEqual(sandbox.workspace, ws_path)
             self.assertEqual(sandbox.current_env.workspace_path, ws_path)
@@ -18,8 +18,8 @@ class TestSandboxClass(unittest.TestCase):
     def test_sandbox_status(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             ws_path = Path(tmpdir).resolve()
-            sandbox = Sandbox(workspace=ws_path, default_image=None)
-            self.assertEqual(sandbox.get_status(), "host")
+            sandbox = Sandbox(default_image_id=None, workspace=ws_path)
+            self.assertEqual(sandbox.get_sandbox_image().id, "host")
 
 
 if __name__ == "__main__":

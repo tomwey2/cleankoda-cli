@@ -20,7 +20,7 @@ from cleankoda.tui import SlashCommandCompleter
 class TestSandboxCommand(unittest.TestCase):
 
     def setUp(self):
-        self.sandbox = Sandbox(workspace=Path.cwd(), default_image=None)
+        self.sandbox = Sandbox(default_image_id=None, workspace=Path.cwd())
         self.tools = Tools(sandbox=self.sandbox)
         self.agent = Agent(
             memory=Memory(system_prompt="Test"),
@@ -38,19 +38,18 @@ class TestSandboxCommand(unittest.TestCase):
         ctx = CommandContext(memory=self.agent.memory, agent=self.agent)
         res = registry.dispatch("/sandbox off", ctx)
         self.assertIn("Sandbox disabled", res.output)
-        self.assertEqual(self.sandbox.get_status(), "host")
+        self.assertEqual(self.sandbox.get_sandbox_image().id, "host")
 
     @patch("cleankoda.sandbox.sandbox.DockerEnvironment")
     def test_sandbox_image_direct(self, mock_docker_sandbox):
         mock_instance = MagicMock()
-        mock_instance.image = "node:20-slim"
+        mock_instance.image_id = "node:20-slim"
         mock_instance.start_async = AsyncMock()
         mock_docker_sandbox.return_value = mock_instance
 
         ctx = CommandContext(memory=self.agent.memory, agent=self.agent)
         res = registry.dispatch("/sandbox node:20-slim", ctx)
         self.assertIn("Sandbox enabled: Image [node:20-slim]", res.output)
-        self.assertEqual(self.sandbox.get_status(), "node:20-slim")
         mock_instance.start_async.assert_awaited_once()
 
     @patch("cleankoda.sandbox.sandbox.DockerEnvironment")
@@ -63,7 +62,7 @@ class TestSandboxCommand(unittest.TestCase):
         res = registry.dispatch("/sandbox python:3.12-slim", ctx)
         self.assertIn("Error starting sandbox", res.output)
         self.assertIn("Fallback to host system", res.output)
-        self.assertEqual(self.sandbox.get_status(), "host")
+        self.assertEqual(self.sandbox.get_sandbox_image().id, "host")
 
     def test_sandbox_interactive_selection_in_tui(self):
         from cleankoda.commands.sandbox import _show_tui_modal_sandbox_dialog

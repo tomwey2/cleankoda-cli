@@ -268,9 +268,9 @@ class TUI:
         return self._cancel_event
 
     def get_session_status_text(self) -> str:
-        sandbox = self.agent.sandbox
-        sb_status = sandbox.get_status() if sandbox else "host"
-        return f"Provider: {config.provider} | Model: {config.model} | Temp: {config.temperature} | Sandbox: {sb_status}"
+        sb_image = self.agent.sandbox.get_sandbox_image()
+        sb_status = "Sandbox: " + sb_image.name if sb_image and sb_image.id != "host" else "no Sandbox"
+        return f"Provider: {config.provider} | Model: {config.model} | Temp: {config.temperature} | {sb_status}"
 
     def update_status_line(self) -> None:
         session_text = self.get_session_status_text()

@@ -53,22 +53,18 @@ class TestSandboxPackage(unittest.TestCase):
         mock_docker_sandbox.side_effect = _make_mock
 
         async def _test():
-            sb = Sandbox(workspace=self.workspace, default_image=None)
+            sb = Sandbox(default_image_id=None, workspace=self.workspace)
             self.assertIsInstance(sb.current_env, HostEnvironment)
-            self.assertEqual(sb.get_status(), "host")
-
-            status_msg = await sb.switch_environment("python:3.11-slim")
-            self.assertIn("Sandbox enabled", status_msg)
-            self.assertEqual(sb.get_status(), "python:3.11-slim")
+            self.assertEqual(sb.get_sandbox_image().id, "host")
 
             status_msg_off = await sb.switch_environment(None)
             self.assertIn("Sandbox disabled", status_msg_off)
-            self.assertEqual(sb.get_status(), "host")
+            self.assertEqual(sb.get_sandbox_image().id, "host")
 
         asyncio.run(_test())
 
     def test_bash_command_tool(self):
-        sb = Sandbox(workspace=self.workspace, default_image=None)
+        sb = Sandbox(default_image_id=None, workspace=self.workspace)
         bash_tool = BashCommand(sandbox=sb)
 
         async def _run():

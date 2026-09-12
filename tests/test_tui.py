@@ -113,7 +113,7 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        sb = Sandbox(workspace=Path.cwd(), default_image=None)
+        sb = Sandbox(default_image_id=None, workspace=Path.cwd())
         tools = Tools(sandbox=sb)
         agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
@@ -132,7 +132,7 @@ class TestTUIEscapeKeybinding(unittest.TestCase):
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        sb = Sandbox(workspace=Path.cwd(), default_image=None)
+        sb = Sandbox(default_image_id=None, workspace=Path.cwd())
         tools = Tools(sandbox=sb)
         agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
@@ -166,7 +166,7 @@ class TestTUIEnterCompletionKeybinding(unittest.TestCase):
         mock_get_app.return_value = mock_app
 
         memory = Memory(system_prompt="Test")
-        sb = Sandbox(workspace=Path.cwd(), default_image=None)
+        sb = Sandbox(default_image_id=None, workspace=Path.cwd())
         tools = Tools(sandbox=sb)
         agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)
@@ -200,7 +200,7 @@ class TestTUIStatusManager(unittest.TestCase):
         from cleankoda.tui import TUI
 
         memory = Memory(system_prompt="Test")
-        sb = Sandbox(workspace=Path.cwd(), default_image=None)
+        sb = Sandbox(default_image_id=None, workspace=Path.cwd())
         tools = Tools(sandbox=sb)
         agent = Agent(memory=memory, llm_service=LLMService(), tools=tools)
         tui = TUI(agent)

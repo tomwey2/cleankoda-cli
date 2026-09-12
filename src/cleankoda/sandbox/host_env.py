@@ -5,7 +5,6 @@ from typing import Any, Dict
 
 from cleankoda.sandbox.base_env import ExecutionEnvironment
 
-
 class HostEnvironment(ExecutionEnvironment):
     """Null-Object Implementation: Executes commands directly on the host system in the workspace."""
 
@@ -14,7 +13,7 @@ class HostEnvironment(ExecutionEnvironment):
         workspace_path: Path,
         max_output_chars: int = 12000,
     ) -> None:
-        super().__init__(workspace_path, max_output_chars)
+        super().__init__("host", workspace_path, max_output_chars)
 
     async def run(self, command: str, timeout: int = 30) -> Dict[str, Any]:
         """Executes a command asynchronously as a subprocess on the host."""

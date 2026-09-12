@@ -60,7 +60,17 @@ AVAILABLE_IMAGES: list[SandboxImageOption] = [
     ),
     SandboxImageOption(
         id="host",
-        name="Host (Keine Sandbox)",
+        name="Host (No Sandbox)",
         description="Befehle direkt im Host-System ausführen",
     ),
 ]
+
+AVAILABLE_IMAGES_BY_ID: dict[str, SandboxImageOption] = {
+    img.id: img for img in AVAILABLE_IMAGES
+}
+
+def get_standbox_image(id):
+    """Returns the corresponded SandboxImageOption of an id"""
+    host: SandboxImageOption = AVAILABLE_IMAGES_BY_ID.get("host")
+    image: SandboxImageOption | None = AVAILABLE_IMAGES_BY_ID.get(id)
+    return image if image else host

@@ -13,7 +13,7 @@ class TestToolsClass(unittest.TestCase):
     def test_tools_workspace_binding(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             ws_path = Path(tmpdir).resolve()
-            sandbox = Sandbox(workspace=ws_path, default_image=None)
+            sandbox = Sandbox(default_image_id=None, workspace=ws_path)
             tools = Tools(sandbox=sandbox)
 
             self.assertEqual(tools.sandbox.workspace, ws_path)
@@ -23,7 +23,7 @@ class TestToolsClass(unittest.TestCase):
         async def _test():
             with tempfile.TemporaryDirectory() as tmpdir:
                 ws_path = Path(tmpdir).resolve()
-                sandbox = Sandbox(workspace=ws_path, default_image=None)
+                sandbox = Sandbox(default_image_id=None, workspace=ws_path)
                 tools = Tools(sandbox=sandbox)
 
                 # Test write_file
@@ -55,7 +55,7 @@ class TestToolsClass(unittest.TestCase):
     def test_tools_schemas(self):
         with tempfile.TemporaryDirectory() as tmpdir:
             ws_path = Path(tmpdir).resolve()
-            sandbox = Sandbox(workspace=ws_path, default_image=None)
+            sandbox = Sandbox(default_image_id=None, workspace=ws_path)
             tools = Tools(sandbox=sandbox)
 
             schemas = tools.get_schemas()

@@ -7,19 +7,18 @@ import docker
 from docker.errors import DockerException
 
 from cleankoda.sandbox.base_env import ExecutionEnvironment
-
+from cleankoda.sandbox.config import SandboxImageOption
 
 class DockerEnvironment(ExecutionEnvironment):
     """Isolated Docker execution environment for shell commands."""
 
     def __init__(
         self,
+        image_id: str,
         workspace_path: Path,
-        image: str = "python:3.11-slim",
         max_output_chars: int = 12000,
     ) -> None:
-        super().__init__(workspace_path, max_output_chars)
-        self.image = image
+        super().__init__(image_id, workspace_path, max_output_chars)
         self.client = docker.from_env()
         self.container = None
         self._ready_event = asyncio.Event()
@@ -34,7 +33,7 @@ class DockerEnvironment(ExecutionEnvironment):
 
         try:
             self.container = self.client.containers.run(
-                image=self.image,
+                image=self.image.id,
                 command="tail -f /dev/null",  # Hält den Container am Leben
                 detach=True,
                 volumes={

@@ -103,7 +103,7 @@ def main(argv: list[str] | None = None) -> None:
 
     sandbox = Sandbox(
         workspace=config.workspace,
-        default_image=config.sandbox if config.sandbox else DEFAULT_IMAGE,
+        default_image_id=config.sandbox if config.sandbox else DEFAULT_IMAGE,
     )
 
     memory = Memory(system_prompt=SYSTEM_PROMPT, file=".agents/memory.json")
