@@ -46,92 +46,99 @@ class Agent:
         """Iteratively calls LLM service, streams responses, executes tools, and records assistant and tool messages in memory."""
         iteration = 0
 
-        while iteration < max_tool_iterations:
-            self._set_state(AgentLifecycle.THINKING)
+        try:
+            while iteration < max_tool_iterations:
+                self._set_state(AgentLifecycle.THINKING)
 
-            if cancel_event is not None and cancel_event.is_set():
-                yield "[yellow]Agent execution cancelled.[/yellow]\n"
-                self._set_state(AgentLifecycle.IDLE)
-                return
-
-            iteration += 1
-            chunks: list[Any] = []
-
-            async for chunk in self.llm_service.stream_completion(
-                messages=self.memory,
-                tools=self.tools.get_schemas(),
-                cancel_event=cancel_event,
-                chunks_out=chunks,
-            ):
-                yield chunk
-
-            if cancel_event is not None and cancel_event.is_set():
-                self._set_state(AgentLifecycle.IDLE)
-                return
-
-            if not chunks:
-                break
-
-            # Reconstruct response message to inspect tool calls
-            try:
-                stream_response_obj = stream_chunk_builder(chunks)
-                response_msg = stream_response_obj.choices[0].message
-            except Exception:
-                break
-
-            tool_calls = getattr(response_msg, "tool_calls", None)
-            if not tool_calls:
-                content_text = getattr(response_msg, "content", None)
-                if content_text:
-                    last_msg = self.memory.messages[-1] if self.memory.messages else None
-                    last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
-                    if last_role != "assistant":
-                        self.memory.add_assistant(content_text)
-                break
-
-            # Save assistant message with tool calls as a clean dictionary in memory
-            if hasattr(response_msg, "model_dump"):
-                response_msg_dict = response_msg.model_dump(exclude_none=True)
-            elif hasattr(response_msg, "dict"):
-                response_msg_dict = response_msg.dict(exclude_none=True)
-            elif isinstance(response_msg, dict):
-                response_msg_dict = response_msg
-            else:
-                response_msg_dict = {"role": "assistant"}
-
-            if isinstance(response_msg_dict, dict):
-                response_msg_dict["role"] = "assistant"
-
-            self.memory.add_message(response_msg_dict)
-
-            # Execute tool calls
-            for tool_call in tool_calls:
                 if cancel_event is not None and cancel_event.is_set():
-                    yield "[yellow]Tool execution cancelled.[/yellow]\n"
-                    self._set_state(AgentLifecycle.IDLE)
-                    return
+                    yield "[yellow]Agent execution cancelled.[/yellow]\n"
+                    break
 
-                func = getattr(tool_call, "function", None)
-                func_name = getattr(func, "name", "unknown") if func else "unknown"
-                func_args = getattr(func, "arguments", "") if func else ""
-                tool_call_id = getattr(tool_call, "id", "") or f"call_{func_name}"
+                iteration += 1
+                chunks: list[Any] = []
 
-                display_str = self.llm_service.format_tool_call_display(func_name, func_args)
-                yield f"{display_str}\n"
+                async for chunk in self.llm_service.stream_completion(
+                    messages=self.memory,
+                    tools=self.tools.get_schemas(),
+                    cancel_event=cancel_event,
+                    chunks_out=chunks,
+                ):
+                    yield chunk
 
+                if cancel_event is not None and cancel_event.is_set():
+                    break
+
+                if not chunks:
+                    break
+
+                # Reconstruct response message to inspect tool calls
                 try:
-                    self._set_state(AgentLifecycle.EXECUTING, f"Execute tool: {func_name}...")
-                    tool_result = await self.tools.run_tool(tool_call)
-                finally:
-                    self._set_state(AgentLifecycle.THINKING)
+                    stream_response_obj = stream_chunk_builder(chunks)
+                    response_msg = stream_response_obj.choices[0].message
+                except Exception:
+                    break
 
-                tool_msg = {
-                    "role": "tool",
-                    "tool_call_id": tool_call_id,
-                    "content": tool_result,
-                }
-                self.memory.add_message(tool_msg)
-        statusline.clear("agent")
+                tool_calls = getattr(response_msg, "tool_calls", None)
+                if not tool_calls:
+                    content_text = getattr(response_msg, "content", None)
+                    if content_text:
+                        last_msg = self.memory.messages[-1] if self.memory.messages else None
+                        last_role = last_msg.get("role") if isinstance(last_msg, dict) else getattr(last_msg, "role", None)
+                        if last_role != "assistant":
+                            self.memory.add_assistant(content_text)
+                    break
+
+                # Save assistant message with tool calls as a clean dictionary in memory
+                if hasattr(response_msg, "model_dump"):
+                    response_msg_dict = response_msg.model_dump(exclude_none=True)
+                elif hasattr(response_msg, "dict"):
+                    response_msg_dict = response_msg.dict(exclude_none=True)
+                elif isinstance(response_msg, dict):
+                    response_msg_dict = response_msg
+                else:
+                    response_msg_dict = {"role": "assistant"}
+
+                if isinstance(response_msg_dict, dict):
+                    response_msg_dict["role"] = "assistant"
+
+                self.memory.add_message(response_msg_dict)
+
+                # Execute tool calls
+                cancelled_in_tools = False
+                for tool_call in tool_calls:
+                    if cancel_event is not None and cancel_event.is_set():
+                        yield "[yellow]Tool execution cancelled.[/yellow]\n"
+                        cancelled_in_tools = True
+                        break
+
+                    func = getattr(tool_call, "function", None)
+                    func_name = getattr(func, "name", "unknown") if func else "unknown"
+                    func_args = getattr(func, "arguments", "") if func else ""
+                    tool_call_id = getattr(tool_call, "id", "") or f"call_{func_name}"
+
+                    display_str = self.llm_service.format_tool_call_display(func_name, func_args)
+                    yield f"{display_str}\n"
+
+                    try:
+                        self._set_state(AgentLifecycle.EXECUTING, f"Execute tool: {func_name}...")
+                        tool_result = await self.tools.run_tool(tool_call)
+                    finally:
+                        self._set_state(AgentLifecycle.THINKING)
+
+                    tool_msg = {
+                        "role": "tool",
+                        "tool_call_id": tool_call_id,
+                        "content": tool_result,
+                    }
+                    self.memory.add_message(tool_msg)
+
+                if cancelled_in_tools:
+                    break
+
+        finally:
+            # Agent loop finished cleanly or cancelled
+            self._set_state(AgentLifecycle.IDLE)
+            statusline.clear("agent")
 
     def is_busy(self) -> bool:
         """Convenient lookup for TUI keybindings and input locks."""
