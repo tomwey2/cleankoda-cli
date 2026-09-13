@@ -10,9 +10,11 @@ from cleankoda.statusline import statusline
 from cleankoda.tools import Tools
 
 SYSTEM_PROMPT = """You are a coding agent running in the user's terminal.
-You can list files, read files, write files, and run shell commands.
+You can list files, read files, write files, and run bash commands.
 Use your tools to complete the user's task, then briefly summarize what you did.
-The working directory is the folder the user launched you from."""
+The working directory is the folder the user launched you from.
+After modifying code, you MUST always verify your changes by running static checks
+and relevant unit tests before concluding your work."""
 
 
 class AgentLifecycle(Enum):
@@ -43,11 +45,14 @@ class Agent:
         cancel_event: asyncio.Event | None = None,
         max_tool_iterations: int = 10,
     ) -> AsyncGenerator[str, None]:
-        """Iteratively calls LLM service, streams responses, executes tools, and records assistant and tool messages in memory."""
+        """Iteratively calls LLM service, streams responses, executes tools,
+        and records assistant and tool messages in memory."""
         iteration = 0
 
         try:
+            # The ReAct Loop: Reasoning + Acting + Observation
             while iteration < max_tool_iterations:
+                # 1. Reasoning (Thought): Request completion and stream LLM response
                 self._set_state(AgentLifecycle.THINKING)
 
                 if cancel_event is not None and cancel_event.is_set():
@@ -72,14 +77,12 @@ class Agent:
                     break
 
                 # Reconstruct response message to inspect tool calls
-                try:
-                    stream_response_obj = stream_chunk_builder(chunks)
-                    response_msg = stream_response_obj.choices[0].message
-                except Exception:
-                    break
+                stream_response_obj = stream_chunk_builder(chunks)
+                response_msg = stream_response_obj.choices[0].message
 
                 tool_calls = getattr(response_msg, "tool_calls", None)
                 if not tool_calls:
+                    # No tool calls requested (LLM provided final text response) - exit agent loop
                     content_text = getattr(response_msg, "content", None)
                     if content_text:
                         last_msg = self.memory.messages[-1] if self.memory.messages else None
@@ -103,7 +106,7 @@ class Agent:
 
                 self.memory.add_message(response_msg_dict)
 
-                # Execute tool calls
+                # 2. Action: Execute proposed tool calls
                 cancelled_in_tools = False
                 for tool_call in tool_calls:
                     if cancel_event is not None and cancel_event.is_set():
@@ -125,6 +128,7 @@ class Agent:
                     finally:
                         self._set_state(AgentLifecycle.THINKING)
 
+                    # 3. Observation (Feedback): Record tool execution results into memory
                     tool_msg = {
                         "role": "tool",
                         "tool_call_id": tool_call_id,
